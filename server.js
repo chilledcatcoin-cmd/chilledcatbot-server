@@ -9,9 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) {
-  throw new Error("❌ BOT_TOKEN missing. Add it in Render environment variables.");
-}
+if (!BOT_TOKEN) throw new Error("❌ BOT_TOKEN missing in environment variables");
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -20,7 +18,7 @@ const bot = new Telegraf(BOT_TOKEN);
    ------------------------------- */
 const GAMES = {
   flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat_2013_tgv1.html",
-  catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/index.html"
+  catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html"
 };
 
 /* -------------------------------
@@ -33,7 +31,7 @@ bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
 bot.command("highscores", async (ctx) => {
   if (!ctx.message.reply_to_message) {
-    return ctx.reply("Reply to a game message with /highscores to see scores.");
+    return ctx.reply("Reply to a game message with /highscores");
   }
   try {
     const resp = await axios.post(
@@ -76,7 +74,7 @@ bot.on("callback_query", async (ctx) => {
     url.searchParams.set("uid", q.from.id);
     url.searchParams.set("chat_id", q.message.chat.id);
     url.searchParams.set("message_id", q.message.message_id);
-    // cache buster
+    // cache buster so Telegram reloads each time
     url.searchParams.set("_ts", Date.now());
 
     return ctx.telegram.answerGameQuery(q.id, url.toString());
@@ -114,7 +112,6 @@ app.post("/score", async (req, res) => {
 
 /* -------------------------------
    HTTP endpoint: /highscores
-   (used by HTML leaderboard)
    ------------------------------- */
 app.post("/highscores", async (req, res) => {
   try {
@@ -131,7 +128,7 @@ app.post("/highscores", async (req, res) => {
         message_id: Number(message_id),
       }
     );
-    res.json(resp.data); // {ok:true, result:[...]}
+    res.json(resp.data);
   } catch (e) {
     console.error("highscores http error:", e.response?.data || e.message);
     res.status(500).json({ ok: false, error: "failed" });
@@ -145,6 +142,5 @@ bot.launch();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on ${PORT}`));
 
-// Graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
