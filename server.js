@@ -17,46 +17,39 @@ const bot = new Telegraf(BOT_TOKEN);
    Game registry
    ------------------------------- */
 const GAMES = {
-  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat_2013_tgv1.html",
+  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat.html",
   catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html"
 };
 
 /* -------------------------------
-   Bot commands
+   Commands
    ------------------------------- */
-// /start with inline menu
 bot.start((ctx) => {
   ctx.reply(
     "😺 Welcome to Chilled Cat Bot!\n\n" +
-    "🎮 Choose a game to play:",
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "▶️ Flappy Cat", callback_game: {}, callback_data: "flappycat" },
-            { text: "▶️ CatSweeper", callback_game: {}, callback_data: "catsweeper" }
-          ]
-        ]
-      }
-    }
+    "Here’s what you can do:\n" +
+    "🎮 /flappycat – Play Flappy Cat\n" +
+    "🎮 /catsweeper – Play CatSweeper\n" +
+    "ℹ️ /help – Show this menu again"
   );
 });
 
-// /help
-bot.command("help", (ctx) => {
+bot.help((ctx) => {
   ctx.reply(
     "🐾 Available commands:\n\n" +
-    "/start - Welcome menu\n" +
+    "/start - Welcome message\n" +
     "/flappycat - Play Flappy Cat\n" +
     "/catsweeper - Play CatSweeper\n" +
     "/highscores - Show high scores (reply to a game message)"
   );
 });
 
-// text commands (still work alongside buttons)
 bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
 bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
+/* -------------------------------
+   Highscores command (manual)
+   ------------------------------- */
 bot.command("highscores", async (ctx) => {
   if (!ctx.message.reply_to_message) {
     return ctx.reply("Reply to a game message with /highscores");
@@ -99,80 +92,96 @@ bot.on("callback_query", async (ctx) => {
       return ctx.answerCbQuery("Unknown game!");
     }
 
-    // Build the game URL
     const url = new URL(GAMES[shortName]);
     url.searchParams.set("uid", q.from.id);
     url.searchParams.set("chat_id", q.message.chat.id);
     url.searchParams.set("message_id", q.message.message_id);
     url.searchParams.set("_ts", Date.now());
 
-    // Log the URL and params for debugging
-    console.log("Launching game:", {
+    console.log("🎮 Launching game:", {
       shortName,
       url: url.toString(),
       user: q.from,
-      chat: q.message.chat
+      chat: q.message.chat,
     });
 
-    // ✅ Always answer within 15s
     await ctx.telegram.answerGameQuery(q.id, url.toString());
-
   } catch (e) {
-    console.error("callback_query error:", e.response?.data || e.message);
+    console.error("❌ callback_query error:", e.response?.data || e.message);
     try {
       await ctx.answerCbQuery("😿 Game could not be loaded, try again.");
     } catch (err) {
-      console.error("Failed to answerCbQuery fallback:", err.message);
+      console.error("Failed to send fallback answerCbQuery:", err.message);
     }
   }
 });
 
-
 /* -------------------------------
-   HTTP endpoints for games
+   HTTP endpoint: /score
    ------------------------------- */
 app.post("/score", async (req, res) => {
   try {
     const { uid, chat_id, message_id, score } = req.body;
+    console.log("📥 Incoming /score:", { uid, chat_id, message_id, score });
+
     if (!uid || !chat_id || !message_id || typeof score !== "number") {
+      console.error("❌ Invalid payload for /score");
       return res.status(400).send("bad payload");
     }
 
+    const payload = {
+      user_id: Number(uid),
+      chat_id: Number(chat_id),
+      message_id: Number(message_id),
+      score: Number(score),
+      force: true,
+    };
+
+    console.log("➡️ Calling Telegram setGameScore with:", payload);
+
     const resp = await axios.post(
       `https://api.telegram.org/bot${BOT_TOKEN}/setGameScore`,
-      {
-        user_id: Number(uid),
-        score: Number(score),
-        chat_id: Number(chat_id),
-        message_id: Number(message_id),
-        force: true,
-      }
+      payload
     );
+
+    console.log("✅ Telegram setGameScore response:", resp.data);
     res.json(resp.data);
   } catch (e) {
-    console.error("score error:", e.response?.data || e.message);
+    console.error("❌ /score error:", e.response?.data || e.message);
     res.status(500).json({ ok: false, error: "failed" });
   }
 });
 
+/* -------------------------------
+   HTTP endpoint: /highscores
+   ------------------------------- */
 app.post("/highscores", async (req, res) => {
   try {
     const { uid, chat_id, message_id } = req.body;
+    console.log("📥 Incoming /highscores:", { uid, chat_id, message_id });
+
     if (!uid || !chat_id || !message_id) {
+      console.error("❌ Invalid payload for /highscores");
       return res.status(400).send("bad payload");
     }
 
+    const payload = {
+      user_id: Number(uid),
+      chat_id: Number(chat_id),
+      message_id: Number(message_id),
+    };
+
+    console.log("➡️ Calling Telegram getGameHighScores with:", payload);
+
     const resp = await axios.post(
       `https://api.telegram.org/bot${BOT_TOKEN}/getGameHighScores`,
-      {
-        user_id: Number(uid),
-        chat_id: Number(chat_id),
-        message_id: Number(message_id),
-      }
+      payload
     );
+
+    console.log("✅ Telegram getGameHighScores response:", resp.data);
     res.json(resp.data);
   } catch (e) {
-    console.error("highscores http error:", e.response?.data || e.message);
+    console.error("❌ /highscores error:", e.response?.data || e.message);
     res.status(500).json({ ok: false, error: "failed" });
   }
 });
