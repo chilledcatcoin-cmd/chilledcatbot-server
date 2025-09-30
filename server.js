@@ -17,7 +17,7 @@ const bot = new Telegraf(BOT_TOKEN);
    Game registry
    ------------------------------- */
 const GAMES = {
-  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat.html",
+  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat_2013_tgv1.html",
   catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html"
 };
 
@@ -187,11 +187,16 @@ app.post("/highscores", async (req, res) => {
 });
 
 /* -------------------------------
-   Launch bot & server
+   Launch bot in webhook mode
    ------------------------------- */
-bot.launch();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on ${PORT}`));
+const WEBHOOK_PATH = "/telegram-bot";
+const WEBHOOK_URL = process.env.WEBHOOK_URL || `https://chilledcatbot-server.onrender.com${WEBHOOK_PATH}`;
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+bot.telegram.setWebhook(WEBHOOK_URL);
+app.use(bot.webhookCallback(WEBHOOK_PATH));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on ${PORT}`);
+  console.log(`🌍 Webhook set at ${WEBHOOK_URL}`);
+});
