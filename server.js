@@ -38,6 +38,7 @@ bot.on("inline_query", async (ctx) => {
 });
 
 // Handle callback queries (when "Play" is tapped)
+/ Handle callback queries (when "Play" is tapped)
 bot.on("callback_query", async (ctx) => {
   try {
     const q = ctx.update.callback_query;
@@ -51,6 +52,9 @@ bot.on("callback_query", async (ctx) => {
     url.searchParams.set("uid", q.from.id);
     url.searchParams.set("chat_id", q.message.chat.id);
     url.searchParams.set("message_id", q.message.message_id);
+
+    // 👇 Add cache buster so Telegram always reloads fresh
+    url.searchParams.set("_ts", Date.now());
 
     return ctx.telegram.answerGameQuery(q.id, url.toString());
   } catch (e) {
