@@ -19,7 +19,7 @@ const bot = new Telegraf(BOT_TOKEN);
    Game registry
    ------------------------------- */
 const GAMES = {
-  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/flappycat.html",
+  flappycat: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/chilled_flappy_cat_2013_tgv1.html",
   catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/index.html"
 };
 
