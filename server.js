@@ -24,8 +24,36 @@ const GAMES = {
 /* -------------------------------
    Bot commands
    ------------------------------- */
-bot.start((ctx) => ctx.reply("😺 Welcome! Play /flappycat or /catsweeper"));
+// /start with inline menu
+bot.start((ctx) => {
+  ctx.reply(
+    "😺 Welcome to Chilled Cat Bot!\n\n" +
+    "🎮 Choose a game to play:",
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "▶️ Flappy Cat", callback_game: {}, callback_data: "flappycat" },
+            { text: "▶️ CatSweeper", callback_game: {}, callback_data: "catsweeper" }
+          ]
+        ]
+      }
+    }
+  );
+});
 
+// /help
+bot.command("help", (ctx) => {
+  ctx.reply(
+    "🐾 Available commands:\n\n" +
+    "/start - Welcome menu\n" +
+    "/flappycat - Play Flappy Cat\n" +
+    "/catsweeper - Play CatSweeper\n" +
+    "/highscores - Show high scores (reply to a game message)"
+  );
+});
+
+// text commands (still work alongside buttons)
 bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
 bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
@@ -64,7 +92,7 @@ bot.command("highscores", async (ctx) => {
 bot.on("callback_query", async (ctx) => {
   try {
     const q = ctx.update.callback_query;
-    const shortName = q.game_short_name;
+    const shortName = q.game_short_name || q.data;
 
     if (!GAMES[shortName]) {
       return ctx.answerCbQuery("Unknown game!");
@@ -74,8 +102,7 @@ bot.on("callback_query", async (ctx) => {
     url.searchParams.set("uid", q.from.id);
     url.searchParams.set("chat_id", q.message.chat.id);
     url.searchParams.set("message_id", q.message.message_id);
-    // cache buster so Telegram reloads each time
-    url.searchParams.set("_ts", Date.now());
+    url.searchParams.set("_ts", Date.now()); // cache-buster
 
     return ctx.telegram.answerGameQuery(q.id, url.toString());
   } catch (e) {
@@ -84,7 +111,7 @@ bot.on("callback_query", async (ctx) => {
 });
 
 /* -------------------------------
-   HTTP endpoint: /score
+   HTTP endpoints for games
    ------------------------------- */
 app.post("/score", async (req, res) => {
   try {
@@ -110,9 +137,6 @@ app.post("/score", async (req, res) => {
   }
 });
 
-/* -------------------------------
-   HTTP endpoint: /highscores
-   ------------------------------- */
 app.post("/highscores", async (req, res) => {
   try {
     const { uid, chat_id, message_id } = req.body;
