@@ -90,25 +90,43 @@ bot.command("highscores", async (ctx) => {
    Callback handler (Play button)
    ------------------------------- */
 bot.on("callback_query", async (ctx) => {
+  const q = ctx.update.callback_query;
   try {
-    const q = ctx.update.callback_query;
-    const shortName = q.game_short_name || q.data;
+    const shortName = q.game_short_name;
 
     if (!GAMES[shortName]) {
+      console.error("Unknown game shortName:", shortName);
       return ctx.answerCbQuery("Unknown game!");
     }
 
+    // Build the game URL
     const url = new URL(GAMES[shortName]);
     url.searchParams.set("uid", q.from.id);
     url.searchParams.set("chat_id", q.message.chat.id);
     url.searchParams.set("message_id", q.message.message_id);
-    url.searchParams.set("_ts", Date.now()); // cache-buster
+    url.searchParams.set("_ts", Date.now());
 
-    return ctx.telegram.answerGameQuery(q.id, url.toString());
+    // Log the URL and params for debugging
+    console.log("Launching game:", {
+      shortName,
+      url: url.toString(),
+      user: q.from,
+      chat: q.message.chat
+    });
+
+    // ✅ Always answer within 15s
+    await ctx.telegram.answerGameQuery(q.id, url.toString());
+
   } catch (e) {
-    console.error("callback_query error:", e.message);
+    console.error("callback_query error:", e.response?.data || e.message);
+    try {
+      await ctx.answerCbQuery("😿 Game could not be loaded, try again.");
+    } catch (err) {
+      console.error("Failed to answerCbQuery fallback:", err.message);
+    }
   }
 });
+
 
 /* -------------------------------
    HTTP endpoints for games
