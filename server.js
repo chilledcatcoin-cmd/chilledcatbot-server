@@ -1,3 +1,51 @@
+/**
+ *
+ *    _______   .---.  .---..-./`)   .---.     .---.       .-''-.   ______     
+ *   /   __  \  |   |  |_ _|\ .-.')  | ,_|     | ,_|     .'_ _   \ |    _ `''. 
+ *  | ,_/  \__) |   |  ( ' )/ `-' \,-./  )   ,-./  )    / ( ` )   '| _ | ) _  \
+ *,-./  )       |   '-(_{;}_)`-'`"`\  '_ '`) \  '_ '`) . (_ o _)  ||( ''_'  ) |
+ *\  '_ '`)     |      (_,_) .---.  > (_)  )  > (_)  ) |  (_,_)___|| . (_) `. |
+ * > (_)  )  __ | _ _--.   | |   | (  .  .-' (  .  .-' '  \   .---.|(_    ._) '
+ *(  .  .-'_/  )|( ' ) |   | |   |  `-'`-'|___`-'`-'|___\  `-'    /|  (_.\.' / 
+ * `-'`-'     / (_{;}_)|   | |   |   |        \|        \\       / |       .'  
+ *   `._____.'  '(_,_) '---' '---'   `--------``--------` `'-..-'  '-----'`    
+ *                                                                           
+ *                   +=*          ***	    _______      ____   ,---------. 			              
+ *                  *:::*        *=.:*	   /   __  \   .'  __ `.\          \	             
+ *                 *.::::+      *:.:::*     | ,_/  \__) /   '  \  \`--.  ,---'         
+ *                 +....+*++**++::::::=*  ,-./  )       |___|  /  |   |   \       
+ *               *+++=:.:::::.:..:.::::*  \  '_ '`)        _.-`   |   :_ _:            
+ *                ++++=--=+=-+:=+++++++=+  > (_)  )  __ .'   _    |   (_I_)        
+ *               *:+..##.:++::+++***=++*  (  .  .-'_/  )|  _( )_  |  (_(=)_)   
+ *               *..*....-+:::++..#:..=+   `-'`-'     / \ (_ o _) /   (_I_)   
+ *               *........+::.+.:++*+..*     `._____.'   '.(_,_).'    '---'
+ *               *...*+:.:::::-....:...+           
+ *               *....*....:=.....::...**:**=*     
+ *               *.....+=...+...-:....-*::+=:+*-*  
+ *                +....+**+**+****.:=+*+.=*:=*.:*  
+ *              **+....=-:####%:+...*.+::::.*=:*   
+ *           *:..=*++=..:+=:::=*....*...*::..:*    
+ *         *+.:+......:+.......:+*-:=+.......*     
+ *         *.=-........:=............:+:...:**     [ chilled cat warez ]       /\_/\         
+ *        *:-=...=...*.++.............*::::*.*     nfo: vibes • meow • zzz    ( o.o )        
+ *        *.*....*::.**:.............*-.:::+.*     rel: 1997 // TON forever    > ^ <         
+ *        *:=....=**+:...........::..*.....+:*     
+ *        **.....+*::=+::.::.....:*:**..:..+:*     
+ *        **.....+:-+*:.:+::::**:-=::+.....+:*     
+ *
+ * =====================================================
+ * Chilled Cat Bot
+ * Version: 1.3.0
+ * Date: 2025-10-01
+ *
+ * Changelog:
+ * v1.3.0 - Added /menu with inline keyboards, cleaned up leaderboard output
+ * v1.2.0 - Added group/global leaderboard support with caching
+ * v1.1.0 - Integrated PlayFab leaderboards
+ * v1.0.0 - Basic game launch (Flappy Cat, CatSweeper)
+ * =====================================================
+ */
+
 require("dotenv").config();
 const express = require("express");
 const { Telegraf } = require("telegraf");
@@ -50,22 +98,55 @@ async function getLeaderboardCached(statName) {
    Bot commands
    ------------------------------- */
 bot.start((ctx) =>
-  ctx.reply("😺 Welcome! Play /flappycat or /catsweeper")
+  ctx.reply("😺 Welcome to Chilled Cat Games!\nChoose an option below:", {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "🎮 Play Flappy Cat", callback_data: "play_flappycat" },
+          { text: "💣 Play CatSweeper", callback_data: "play_catsweeper" }
+        ],
+        [
+          { text: "🏆 Leaderboards", callback_data: "show_leaderboards" }
+        ]
+      ]
+    }
+  })
 );
 
+bot.command("menu", (ctx) =>
+  ctx.reply("📋 Main Menu — Chilled Cat Games", {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "🎮 Flappy Cat", callback_data: "play_flappycat" },
+          { text: "💣 CatSweeper", callback_data: "play_catsweeper" }
+        ],
+        [
+          { text: "🏆 FlappyCat Global", callback_data: "lb_flappycat_global" },
+          { text: "🏆 FlappyCat Group", callback_data: "lb_flappycat_group" }
+        ],
+        [
+          { text: "🏆 CatSweeper Global", callback_data: "lb_catsweeper_global" },
+          { text: "🏆 CatSweeper Group", callback_data: "lb_catsweeper_group" }
+        ]
+      ]
+    }
+  })
+);
+
+// legacy commands still work
 bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
 bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
 bot.command("leaderboard", async (ctx) => {
   const parts = ctx.message.text.split(" ");
   const game = parts[1];
-  const scope = parts[2] || "global"; // new: allow global or group
+  const scope = parts[2] || "global";
 
   if (!game || !GAMES[game]) {
     return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group]");
   }
 
-  // scope selection
   const statName = scope === "group"
     ? `${game}_${ctx.chat.id}`
     : `${game}_global`;
@@ -74,47 +155,85 @@ bot.command("leaderboard", async (ctx) => {
     const list = await getLeaderboardCached(statName);
     if (!list.length) return ctx.reply("No scores yet 😺");
 
-    let msg = `🏆 Leaderboard — ${game} (${scope})\n`;
+    let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
     list.forEach((e, i) => {
       const name = e.DisplayName || `Player${i + 1}`;
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
     });
-    ctx.reply(msg);
+    ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (e) {
     console.error("Leaderboard error", e.response?.data || e.message);
-    ctx.reply("Failed to fetch leaderboard.");
+    ctx.reply("⚠️ Failed to fetch leaderboard.");
   }
 });
 
 /* -------------------------------
-   Callback handler (Play button)
+   Callback handler
    ------------------------------- */
 bot.on("callback_query", async (ctx) => {
   const q = ctx.update.callback_query;
-  const shortName = q.game_short_name;
+  const data = q.data;
 
-  if (!GAMES[shortName]) {
-    return ctx.answerCbQuery("Unknown game!");
+  // Handle game launch
+  if (data === "play_flappycat" || data === "play_catsweeper") {
+    const shortName = data.replace("play_", "");
+    const url = new URL(GAMES[shortName]);
+    url.searchParams.set("uid", q.from.id);
+    url.searchParams.set("chat_id", q.message.chat.id);
+    url.searchParams.set("message_id", q.message.message_id);
+    url.searchParams.set("_ts", Date.now());
+    const tgName = q.from.username || q.from.first_name || "Anonymous";
+    url.searchParams.set("username", tgName);
+
+    return ctx.telegram.answerGameQuery(q.id, url.toString());
   }
 
-  const url = new URL(GAMES[shortName]);
-  url.searchParams.set("uid", q.from.id);
-  url.searchParams.set("chat_id", q.message.chat.id);
-  url.searchParams.set("message_id", q.message.message_id);
-  url.searchParams.set("_ts", Date.now());
+  // Handle leaderboard buttons
+  if (data.startsWith("lb_")) {
+    const [_, game, scope] = data.split("_");
+    const statName = scope === "group"
+      ? `${game}_${ctx.chat.id}`
+      : `${game}_global`;
 
-  // 🔥 NEW: include Telegram username (or fallback)
-  const tgName = q.from.username || q.from.first_name || "Anonymous";
-  url.searchParams.set("username", tgName);
+    try {
+      const list = await getLeaderboardCached(statName);
+      if (!list.length) return ctx.reply("No scores yet 😺");
 
-  return ctx.telegram.answerGameQuery(q.id, url.toString());
+      let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
+      list.forEach((e, i) => {
+        const name = e.DisplayName || `Player${i + 1}`;
+        msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
+      });
+      ctx.reply(msg, { parse_mode: "Markdown" });
+    } catch (e) {
+      console.error("Leaderboard error", e.response?.data || e.message);
+      ctx.reply("⚠️ Failed to fetch leaderboard.");
+    }
+  }
+
+  if (data === "show_leaderboards") {
+    return ctx.reply("📊 Choose a leaderboard:", {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "FlappyCat Global", callback_data: "lb_flappycat_global" },
+            { text: "FlappyCat Group", callback_data: "lb_flappycat_group" }
+          ],
+          [
+            { text: "CatSweeper Global", callback_data: "lb_catsweeper_global" },
+            { text: "CatSweeper Group", callback_data: "lb_catsweeper_group" }
+          ]
+        ]
+      }
+    });
+  }
 });
 
 /* -------------------------------
    Webhook Mode (Render)
    ------------------------------- */
 const PORT = process.env.PORT || 3000;
-const DOMAIN = process.env.RENDER_EXTERNAL_URL; // Render injects this
+const DOMAIN = process.env.RENDER_EXTERNAL_URL;
 
 if (!DOMAIN) {
   throw new Error("❌ Missing RENDER_EXTERNAL_URL environment variable");
