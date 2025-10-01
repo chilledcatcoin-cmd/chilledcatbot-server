@@ -48,7 +48,7 @@
 const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 
-const contests = new Map(); // key: chat_id, value: { game, contestKey, expires, interval }
+const contests = new Map(); // key: chat_id, value: { game, contestKey, expires }
 
 /* Utility: make unique contest key */
 function makeContestKey(game, chatId) {
@@ -98,7 +98,7 @@ async function startContest(ctx, game, minutes) {
             `Use /leaderboard ${game} contest to check standings.`,
             { parse_mode: "Markdown" });
 
-  // Schedule auto-post updates
+  // Schedule auto-post updates (4x during contest)
   const intervalMs = (minutes * 60 * 1000) / 4;
   for (let i = 1; i <= 4; i++) {
     setTimeout(async () => {
@@ -163,4 +163,21 @@ async function endContest(ctx, game) {
   }
 }
 
-module.exports = { contests, startContest, endContest };
+/* Wire contest commands into the bot */
+function setupContests(bot) {
+  bot.command("startcontest", async (ctx) => {
+    const parts = ctx.message.text.split(" ");
+    const game = parts[1];
+    const minutes = parseInt(parts[2] || "10"); // default 10 minutes
+    await startContest(ctx, game, minutes);
+  });
+
+  bot.command("endcontest", async (ctx) => {
+    const parts = ctx.message.text.split(" ");
+    const game = parts[1];
+    if (!game) return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
+    await endContest(ctx, game);
+  });
+}
+
+module.exports = { contests, startContest, endContest, setupContests };
