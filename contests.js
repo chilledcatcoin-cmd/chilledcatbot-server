@@ -94,9 +94,26 @@ async function startContest(ctx, game, minutes) {
 
   contests.set(ctx.chat.id, { game, contestKey, expires });
 
-  ctx.reply(`🎉 Contest started for *${game}*! Runs for ${minutes} minutes.\n` +
-            `Use /leaderboard ${game} contest to check standings.`,
-            { parse_mode: "Markdown" });
+// Map short names to nice titles
+const gameTitles = {
+  flappycat: "Flappy Cat — A Chilled Cat Game",
+  catsweeper: "CatSweeper ’97 — Minesweeper with Cats"
+};
+
+const niceName = gameTitles[game] || game;
+
+ctx.reply(
+  `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
+  `Use "/leaderboard ${game} contest" to check standings.`,
+  {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: `▶️ Play ${niceName}`, callback_game: { game_short_name: game } }]
+      ]
+    }
+  }
+);
 
   // Schedule auto-post updates (4x during contest)
   const intervalMs = (minutes * 60 * 1000) / 4;
