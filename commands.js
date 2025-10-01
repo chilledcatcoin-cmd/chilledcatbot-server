@@ -50,6 +50,42 @@ const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 const { contests, startContest, endContest } = require("./contests");
 
+async function sendLeaderboard(ctx, game, scope = "global") {
+  if (!game || !GAMES[game]) {
+    return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group|contest]");
+  }
+
+  let statName;
+  if (scope === "group") {
+    statName = `${game}_${ctx.chat.id}`;
+  } else if (scope === "contest") {
+    const c = contests.get(ctx.chat.id);
+    if (!c || c.game !== game || Date.now() > c.expires) {
+      return ctx.reply("⚠️ No active contest for this game in this group.");
+    }
+    statName = c.contestKey;
+  } else if (scope === "global") {
+    statName = `${game}_global`;
+  } else {
+    return ctx.reply("⚠️ Invalid scope. Use: global, group, or contest.");
+  }
+
+  try {
+    const list = await getLeaderboardCached(statName);
+    if (!list.length) return ctx.reply("No scores yet 😺");
+
+    let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
+    list.forEach((e, i) => {
+      const name = e.DisplayName || `Player${i + 1}`;
+      msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
+    });
+    ctx.reply(msg, { parse_mode: "Markdown" });
+  } catch (e) {
+    console.error("Leaderboard error", e.response?.data || e.message);
+    ctx.reply("⚠️ Failed to fetch leaderboard.");
+  }
+}
+
 function setupCommands(bot) {
   bot.start((ctx) => {
     ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
@@ -64,46 +100,22 @@ function setupCommands(bot) {
   bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
   bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
+  // General leaderboard
   bot.command("leaderboard", async (ctx) => {
     const parts = ctx.message.text.split(" ");
     const game = parts[1];
     const scope = parts[2] || "global";
-
-    if (!game || !GAMES[game]) {
-      return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group|contest]");
-    }
-
-let statName;
-if (scope === "group") {
-  statName = `${game}_${ctx.chat.id}`;
-} else if (scope === "contest") {
-  const c = contests.get(ctx.chat.id);
-  if (!c || c.game !== game || Date.now() > c.expires) {
-    return ctx.reply("⚠️ No active contest for this game in this group.");
-  }
-  statName = c.contestKey;
-} else if (scope === "global") {
-  statName = `${game}_global`;
-} else {
-  return ctx.reply("⚠️ Invalid scope. Use: /leaderboard <game> [global|group|contest]");
-}
-
-
-    try {
-      const list = await getLeaderboardCached(statName);
-      if (!list.length) return ctx.reply("No scores yet 😺");
-
-      let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
-      list.forEach((e, i) => {
-        const name = e.DisplayName || `Player${i + 1}`;
-        msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
-      });
-      ctx.reply(msg, { parse_mode: "Markdown" });
-    } catch (e) {
-      console.error("Leaderboard error", e.response?.data || e.message);
-      ctx.reply("⚠️ Failed to fetch leaderboard.");
-    }
+    await sendLeaderboard(ctx, game, scope);
   });
+
+  // Short leaderboard commands
+  bot.command("flappyglobal", (ctx) => sendLeaderboard(ctx, "flappycat", "global"));
+  bot.command("flappygroup", (ctx) => sendLeaderboard(ctx, "flappycat", "group"));
+  bot.command("flappycontest", (ctx) => sendLeaderboard(ctx, "flappycat", "contest"));
+
+  bot.command("sweeperglobal", (ctx) => sendLeaderboard(ctx, "catsweeper", "global"));
+  bot.command("sweepergroup", (ctx) => sendLeaderboard(ctx, "catsweeper", "group"));
+  bot.command("sweepercontest", (ctx) => sendLeaderboard(ctx, "catsweeper", "contest"));
 
   /* -------------------------------
      Contest Commands
@@ -111,9 +123,8 @@ if (scope === "group") {
   bot.command("startcontest", async (ctx) => {
     const parts = ctx.message.text.split(" ");
     const game = parts[1];
-    const minutes = parseInt(parts[2] || "30"); // default 30m if not set
+    const minutes = parseInt(parts[2] || "30"); // default 30m
 
-    // Admin check for groups
     if (ctx.chat.type.endsWith("group")) {
       try {
         const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
@@ -133,7 +144,6 @@ if (scope === "group") {
     const parts = ctx.message.text.split(" ");
     const game = parts[1];
 
-    // Admin check for groups
     if (ctx.chat.type.endsWith("group")) {
       try {
         const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
@@ -168,7 +178,6 @@ if (scope === "group") {
       const tgName = q.from.username || q.from.first_name || "Anonymous";
       url.searchParams.set("username", tgName);
 
-      // If contest active, attach contest key
       const c = contests.get(ctx.chat.id);
       if (c && c.game === shortName && Date.now() < c.expires) {
         url.searchParams.set("contest", c.contestKey);
