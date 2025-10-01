@@ -103,9 +103,16 @@ const gameTitles = {
 const niceName = gameTitles[game] || game;
 
 ctx.reply(
-  `🎉 Contest started for *Flappy Cat — A Chilled Cat Game*! Runs for ${minutes} minutes.\n` +
-  `Use /flappycontest to check standings.`,
-  { parse_mode: "Markdown" }
+  `🎉 Contest started for *${game === "flappycat" ? "Flappy Cat — A Chilled Cat Game" : "CatSweeper — A Chilled Cat Minesweeper"}*! Runs for ${minutes} minutes.\n` +
+  `Use /${game}contest to check standings.`,
+  {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: `▶️ Play ${game === "flappycat" ? "Flappy Cat" : "CatSweeper"}`, callback_game: {} }]
+      ]
+    }
+  }
 );
 
 // Send a proper game button after the announcement
