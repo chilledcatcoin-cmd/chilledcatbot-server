@@ -29,51 +29,138 @@
  *         *.=-........:=............:+:...:**     [ chilled cat warez ]       /\_/\         
  *        *:-=...=...*.++.............*::::*.*     nfo: vibes • meow • zzz    ( o.o )        
  *        *.*....*::.**:.............*-.:::+.*     rel: 1997 // TON forever    > ^ <         
- *        *:=....=**+:...........::..*.....+:*     
+ *        *:=....=**+:...........::..*.....+:*     /star
  *        **.....+*::=+::.::.....:*:**..:..+:*     
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
  * ChilledCatBot - Contests - contests.js - Manages timed contests for groups
- * Version: 1.4.0
+ * Version: 1.5.0
  * Date: 2025-10-01
  *
  * Changelog:
+ * v1.4.0 - Start/end contests per group, Contest length in minutes, Auto-post top 10 leaderboard 4x during contest, Show time remaining in updates, Final standings with 🥇🥈🥉 medals
  * v1.4.0 - Added /startcontest and /endcontest
  * v1.3.0 - Contest tracking with auto-expire timers
  * =====================================================
  */
 
-const { getLeaderboardCached, formatLeaderboard } = require("./leaderboard");
+const { GAMES } = require("./games");
+const { getLeaderboardCached } = require("./leaderboard");
 
-const contests = new Map();
+const contests = new Map(); // key: chat_id, value: { game, contestKey, expires, interval }
 
+/* Utility: make unique contest key */
 function makeContestKey(game, chatId) {
   return `${game}_contest_${chatId}_${Date.now()}`;
 }
 
-module.exports = (bot) => {
-  bot.command("startcontest", async (ctx) => {
-    const parts = ctx.message.text.split(" ");
-    const game = parts[1];
-    const hours = parseInt(parts[2] || "24");
+/* Format leaderboard nicely */
+function formatLeaderboard(game, scope, list, timeRemaining = null, final = false) {
+  let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
 
-    if (!game) {
-      return ctx.reply("Usage: /startcontest <flappycat|catsweeper> <hours>");
+  list.forEach((e, i) => {
+    let name = e.DisplayName || `Player${i + 1}`;
+    let line = `${i + 1}. ${name} — ${e.StatValue}`;
+
+    if (final) {
+      if (i === 0) line = `🥇 ${line}`;
+      if (i === 1) line = `🥈 ${line}`;
+      if (i === 2) line = `🥉 ${line}`;
     }
 
-    const contestKey = makeContestKey(game, ctx.chat.id);
-    const expires = Date.now() + hours * 3600 * 1000;
-    contests.set(ctx.chat.id, { game, contestKey, expires });
-
-    setTimeout(() => contests.delete(ctx.chat.id), hours * 3600 * 1000);
-
-    ctx.reply(`🎉 Contest started for *${game}*! Runs for ${hours}h.\n` +
-              `Use /leaderboard ${game} contest to check standings.`, { parse_mode: "Markdown" });
+    msg += line + "\n";
   });
 
-  bot.command("endcontest", (ctx) => {
-    contests.delete(ctx.chat.id);
-    ctx.reply("🏁 Contest ended!");
-  });
-};
+  if (timeRemaining) {
+    msg += `\n⏳ Time remaining: *${Math.ceil(timeRemaining / 60000)}m*`;
+  }
+
+  if (final) {
+    msg += `\n\n🏁 Contest ended, congrats to all who played!`;
+  }
+
+  return msg;
+}
+
+/* Start contest */
+async function startContest(ctx, game, minutes) {
+  if (!game || !GAMES[game]) {
+    return ctx.reply("Usage: /startcontest <flappycat|catsweeper> <minutes>");
+  }
+
+  const contestKey = makeContestKey(game, ctx.chat.id);
+  const expires = Date.now() + minutes * 60 * 1000;
+
+  contests.set(ctx.chat.id, { game, contestKey, expires });
+
+  ctx.reply(`🎉 Contest started for *${game}*! Runs for ${minutes} minutes.\n` +
+            `Use /leaderboard ${game} contest to check standings.`,
+            { parse_mode: "Markdown" });
+
+  // Schedule auto-post updates
+  const intervalMs = (minutes * 60 * 1000) / 4;
+  for (let i = 1; i <= 4; i++) {
+    setTimeout(async () => {
+      const c = contests.get(ctx.chat.id);
+      if (!c || c.contestKey !== contestKey || Date.now() > c.expires) return;
+
+      try {
+        const list = await getLeaderboardCached(c.contestKey);
+        if (list.length) {
+          const timeRemaining = c.expires - Date.now();
+          const msg = formatLeaderboard(game, "contest", list, timeRemaining, false);
+          ctx.reply(msg, { parse_mode: "Markdown" });
+        }
+      } catch (err) {
+        console.error("Auto-post leaderboard failed:", err);
+      }
+    }, intervalMs * i);
+  }
+
+  // Auto-expire contest
+  setTimeout(async () => {
+    const c = contests.get(ctx.chat.id);
+    if (c && c.contestKey === contestKey) {
+      contests.delete(ctx.chat.id);
+
+      try {
+        const list = await getLeaderboardCached(contestKey);
+        if (list.length) {
+          const msg = formatLeaderboard(game, "contest", list, null, true);
+          ctx.reply(msg, { parse_mode: "Markdown" });
+        } else {
+          ctx.reply(`🏁 Contest for *${game}* ended. No scores recorded.`, { parse_mode: "Markdown" });
+        }
+      } catch (err) {
+        console.error("Final leaderboard fetch failed:", err);
+        ctx.reply(`🏁 Contest for *${game}* ended.`, { parse_mode: "Markdown" });
+      }
+    }
+  }, minutes * 60 * 1000);
+}
+
+/* End contest manually */
+async function endContest(ctx, game) {
+  const c = contests.get(ctx.chat.id);
+  if (!c || c.game !== game) {
+    return ctx.reply("⚠️ No active contest for this game.");
+  }
+
+  contests.delete(ctx.chat.id);
+
+  try {
+    const list = await getLeaderboardCached(c.contestKey);
+    if (list.length) {
+      const msg = formatLeaderboard(game, "contest", list, null, true);
+      ctx.reply(msg, { parse_mode: "Markdown" });
+    } else {
+      ctx.reply(`🏁 Contest for *${game}* ended. No scores recorded.`, { parse_mode: "Markdown" });
+    }
+  } catch (err) {
+    console.error("Manual contest end fetch failed:", err);
+    ctx.reply(`🏁 Contest for *${game}* ended.`, { parse_mode: "Markdown" });
+  }
+}
+
+module.exports = { contests, startContest, endContest };

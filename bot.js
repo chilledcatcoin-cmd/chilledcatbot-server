@@ -46,11 +46,16 @@
  */
 
 const { Telegraf } = require("telegraf");
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const { setupCommands } = require("./commands");
+const { setupContests } = require("./contests");
 
-// attach modules
-require("./commands")(bot);
-require("./games")(bot);
-require("./contests")(bot);
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
-module.exports = bot;
+const bot = new Telegraf(BOT_TOKEN);
+
+// Load commands & contests
+setupCommands(bot);
+setupContests(bot);
+
+module.exports = { bot };

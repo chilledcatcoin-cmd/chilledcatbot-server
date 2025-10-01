@@ -50,30 +50,4 @@ const GAMES = {
   catsweeper: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html"
 };
 
-module.exports = (bot) => {
-  bot.on("callback_query", async (ctx) => {
-    const q = ctx.update.callback_query;
-
-    if (q.game_short_name) {
-      const shortName = q.game_short_name;
-      if (!GAMES[shortName]) {
-        return ctx.answerCbQuery("Unknown game!");
-      }
-
-      const url = new URL(GAMES[shortName]);
-      url.searchParams.set("uid", q.from.id);
-      url.searchParams.set("chat_id", q.message.chat.id);
-      url.searchParams.set("message_id", q.message.message_id);
-      url.searchParams.set("_ts", Date.now());
-
-      const tgName = q.from.username || q.from.first_name || "Anonymous";
-      url.searchParams.set("username", tgName);
-
-      return ctx.telegram.answerGameQuery(q.id, url.toString());
-    }
-  });
-
-  // Legacy commands
-  bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
-  bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
-};
+module.exports = { GAMES };

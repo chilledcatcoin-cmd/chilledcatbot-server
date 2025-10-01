@@ -49,7 +49,7 @@
 
 require("dotenv").config();
 const express = require("express");
-const bot = require("./bot");
+const { bot } = require("./bot");
 
 const app = express();
 app.use(express.json());
@@ -58,14 +58,12 @@ const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.RENDER_EXTERNAL_URL;
 
 if (!DOMAIN) {
-  throw new Error("❌ Missing RENDER_EXTERNAL_URL");
+  throw new Error("❌ Missing RENDER_EXTERNAL_URL environment variable");
 }
 
 bot.telegram.setWebhook(`${DOMAIN}/bot${process.env.BOT_TOKEN}`);
 app.use(bot.webhookCallback(`/bot${process.env.BOT_TOKEN}`));
 
-app.get("/", (req, res) => res.send("✅ Chilled Cat Bot running"));
+app.get("/", (req, res) => res.send("✅ Chilled Cat Bot is running via webhook"));
 
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on ${PORT} with webhook mode`)
-);
+app.listen(PORT, () => console.log(`🚀 Server running on ${PORT}`));

@@ -46,6 +46,10 @@
  */
 
 const axios = require("axios");
+
+const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
+const PLAYFAB_DEV_SECRET = process.env.PLAYFAB_DEV_SECRET;
+
 const cache = new Map();
 
 async function getLeaderboardCached(statName) {
@@ -55,13 +59,13 @@ async function getLeaderboardCached(statName) {
   }
 
   const resp = await axios.post(
-    `https://${process.env.PLAYFAB_TITLE_ID}.playfabapi.com/Server/GetLeaderboard`,
+    `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Server/GetLeaderboard`,
     {
       StatisticName: statName,
       StartPosition: 0,
       MaxResultsCount: 10,
     },
-    { headers: { "X-SecretKey": process.env.PLAYFAB_DEV_SECRET } }
+    { headers: { "X-SecretKey": PLAYFAB_DEV_SECRET } }
   );
 
   const list = resp.data.data.Leaderboard;
@@ -69,14 +73,4 @@ async function getLeaderboardCached(statName) {
   return list;
 }
 
-function formatLeaderboard(game, scope, list) {
-  if (!list.length) return "No scores yet 😺";
-  let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
-  list.forEach((e, i) => {
-    const name = e.DisplayName || `Player${i + 1}`;
-    msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
-  });
-  return msg;
-}
-
-module.exports = { getLeaderboardCached, formatLeaderboard };
+module.exports = { getLeaderboardCached };
