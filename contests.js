@@ -103,17 +103,29 @@ const gameTitles = {
 const niceName = gameTitles[game] || game;
 
 ctx.reply(
-  `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
-  `Use "/leaderboard ${game} contest" to check standings.`,
-  {
-    parse_mode: "Markdown",
+  `🎉 Contest started for *Flappy Cat — A Chilled Cat Game*! Runs for ${minutes} minutes.\n` +
+  `Use /flappycontest to check standings.`,
+  { parse_mode: "Markdown" }
+);
+
+// Send a proper game button after the announcement
+if (game === "flappycat") {
+  ctx.reply("▶️ Play Flappy Cat", {
     reply_markup: {
       inline_keyboard: [
-        [{ text: `▶️ Play ${niceName}`, callback_game: { game_short_name: game } }]
+        [{ text: "Play Flappy Cat", callback_game: {} }]
       ]
     }
-  }
-);
+  });
+} else if (game === "catsweeper") {
+  ctx.reply("▶️ Play CatSweeper", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Play CatSweeper", callback_game: {} }]
+      ]
+    }
+  });
+}
 
   // Schedule auto-post updates (4x during contest)
   const intervalMs = (minutes * 60 * 1000) / 4;
