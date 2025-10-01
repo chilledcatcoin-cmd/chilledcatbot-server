@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<!--
 /**
  *
  *    _______   .---.  .---..-./`)   .---.     .---.       .-''-.   ______     
@@ -45,6 +47,7 @@
  * v1.0.0 - Basic game launch (Flappy Cat, CatSweeper)
  * =====================================================
  */
+-->
 
 require("dotenv").config();
 const express = require("express");
@@ -98,55 +101,22 @@ async function getLeaderboardCached(statName) {
    Bot commands
    ------------------------------- */
 bot.start((ctx) =>
-  ctx.reply("😺 Welcome to Chilled Cat Games!\nChoose an option below:", {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "🎮 Play Flappy Cat", callback_data: "play_flappycat" },
-          { text: "💣 Play CatSweeper", callback_data: "play_catsweeper" }
-        ],
-        [
-          { text: "🏆 Leaderboards", callback_data: "show_leaderboards" }
-        ]
-      ]
-    }
-  })
+  ctx.reply("😺 Welcome! Play /flappycat or /catsweeper")
 );
 
-bot.command("menu", (ctx) =>
-  ctx.reply("📋 Main Menu — Chilled Cat Games", {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "🎮 Flappy Cat", callback_data: "play_flappycat" },
-          { text: "💣 CatSweeper", callback_data: "play_catsweeper" }
-        ],
-        [
-          { text: "🏆 FlappyCat Global", callback_data: "lb_flappycat_global" },
-          { text: "🏆 FlappyCat Group", callback_data: "lb_flappycat_group" }
-        ],
-        [
-          { text: "🏆 CatSweeper Global", callback_data: "lb_catsweeper_global" },
-          { text: "🏆 CatSweeper Group", callback_data: "lb_catsweeper_group" }
-        ]
-      ]
-    }
-  })
-);
-
-// legacy commands still work
 bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
 bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
 bot.command("leaderboard", async (ctx) => {
   const parts = ctx.message.text.split(" ");
   const game = parts[1];
-  const scope = parts[2] || "global";
+  const scope = parts[2] || "global"; // new: allow global or group
 
   if (!game || !GAMES[game]) {
     return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group]");
   }
 
+  // scope selection
   const statName = scope === "group"
     ? `${game}_${ctx.chat.id}`
     : `${game}_global`;
@@ -155,85 +125,47 @@ bot.command("leaderboard", async (ctx) => {
     const list = await getLeaderboardCached(statName);
     if (!list.length) return ctx.reply("No scores yet 😺");
 
-    let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
+    let msg = `🏆 Leaderboard — ${game} (${scope})\n`;
     list.forEach((e, i) => {
       const name = e.DisplayName || `Player${i + 1}`;
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
     });
-    ctx.reply(msg, { parse_mode: "Markdown" });
+    ctx.reply(msg);
   } catch (e) {
     console.error("Leaderboard error", e.response?.data || e.message);
-    ctx.reply("⚠️ Failed to fetch leaderboard.");
+    ctx.reply("Failed to fetch leaderboard.");
   }
 });
 
 /* -------------------------------
-   Callback handler
+   Callback handler (Play button)
    ------------------------------- */
 bot.on("callback_query", async (ctx) => {
   const q = ctx.update.callback_query;
-  const data = q.data;
+  const shortName = q.game_short_name;
 
-  // Handle game launch
-  if (data === "play_flappycat" || data === "play_catsweeper") {
-    const shortName = data.replace("play_", "");
-    const url = new URL(GAMES[shortName]);
-    url.searchParams.set("uid", q.from.id);
-    url.searchParams.set("chat_id", q.message.chat.id);
-    url.searchParams.set("message_id", q.message.message_id);
-    url.searchParams.set("_ts", Date.now());
-    const tgName = q.from.username || q.from.first_name || "Anonymous";
-    url.searchParams.set("username", tgName);
-
-    return ctx.telegram.answerGameQuery(q.id, url.toString());
+  if (!GAMES[shortName]) {
+    return ctx.answerCbQuery("Unknown game!");
   }
 
-  // Handle leaderboard buttons
-  if (data.startsWith("lb_")) {
-    const [_, game, scope] = data.split("_");
-    const statName = scope === "group"
-      ? `${game}_${ctx.chat.id}`
-      : `${game}_global`;
+  const url = new URL(GAMES[shortName]);
+  url.searchParams.set("uid", q.from.id);
+  url.searchParams.set("chat_id", q.message.chat.id);
+  url.searchParams.set("message_id", q.message.message_id);
+  url.searchParams.set("_ts", Date.now());
 
-    try {
-      const list = await getLeaderboardCached(statName);
-      if (!list.length) return ctx.reply("No scores yet 😺");
+  // 🔥 NEW: include Telegram username (or fallback)
+  const tgName = q.from.username || q.from.first_name || "Anonymous";
+  url.searchParams.set("username", tgName);
 
-      let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
-      list.forEach((e, i) => {
-        const name = e.DisplayName || `Player${i + 1}`;
-        msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
-      });
-      ctx.reply(msg, { parse_mode: "Markdown" });
-    } catch (e) {
-      console.error("Leaderboard error", e.response?.data || e.message);
-      ctx.reply("⚠️ Failed to fetch leaderboard.");
-    }
-  }
-
-  if (data === "show_leaderboards") {
-    return ctx.reply("📊 Choose a leaderboard:", {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "FlappyCat Global", callback_data: "lb_flappycat_global" },
-            { text: "FlappyCat Group", callback_data: "lb_flappycat_group" }
-          ],
-          [
-            { text: "CatSweeper Global", callback_data: "lb_catsweeper_global" },
-            { text: "CatSweeper Group", callback_data: "lb_catsweeper_group" }
-          ]
-        ]
-      }
-    });
-  }
+  return ctx.telegram.answerGameQuery(q.id, url.toString());
 });
 
 /* -------------------------------
    Webhook Mode (Render)
    ------------------------------- */
 const PORT = process.env.PORT || 3000;
-const DOMAIN = process.env.RENDER_EXTERNAL_URL;
+const DOMAIN = process.env.RENDER_EXTERNAL_URL; // Render injects this
 
 if (!DOMAIN) {
   throw new Error("❌ Missing RENDER_EXTERNAL_URL environment variable");
