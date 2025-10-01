@@ -73,18 +73,21 @@ function setupCommands(bot) {
       return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group|contest]");
     }
 
-    let statName;
-    if (scope === "group") {
-      statName = `${game}_${ctx.chat.id}`;
-    } else if (scope === "contest") {
-      const c = contests.get(ctx.chat.id);
-      if (!c || c.game !== game || Date.now() > c.expires) {
-        return ctx.reply("⚠️ No active contest for this game in this group.");
-      }
-      statName = c.contestKey;
-    } else {
-      statName = `${game}_global`;
-    }
+let statName;
+if (scope === "group") {
+  statName = `${game}_${ctx.chat.id}`;
+} else if (scope === "contest") {
+  const c = contests.get(ctx.chat.id);
+  if (!c || c.game !== game || Date.now() > c.expires) {
+    return ctx.reply("⚠️ No active contest for this game in this group.");
+  }
+  statName = c.contestKey;
+} else if (scope === "global") {
+  statName = `${game}_global`;
+} else {
+  return ctx.reply("⚠️ Invalid scope. Use: /leaderboard <game> [global|group|contest]");
+}
+
 
     try {
       const list = await getLeaderboardCached(statName);
