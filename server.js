@@ -1,54 +1,3 @@
-<!DOCTYPE html>
-<!--
-/**
- *
- *    _______   .---.  .---..-./`)   .---.     .---.       .-''-.   ______     
- *   /   __  \  |   |  |_ _|\ .-.')  | ,_|     | ,_|     .'_ _   \ |    _ `''. 
- *  | ,_/  \__) |   |  ( ' )/ `-' \,-./  )   ,-./  )    / ( ` )   '| _ | ) _  \
- *,-./  )       |   '-(_{;}_)`-'`"`\  '_ '`) \  '_ '`) . (_ o _)  ||( ''_'  ) |
- *\  '_ '`)     |      (_,_) .---.  > (_)  )  > (_)  ) |  (_,_)___|| . (_) `. |
- * > (_)  )  __ | _ _--.   | |   | (  .  .-' (  .  .-' '  \   .---.|(_    ._) '
- *(  .  .-'_/  )|( ' ) |   | |   |  `-'`-'|___`-'`-'|___\  `-'    /|  (_.\.' / 
- * `-'`-'     / (_{;}_)|   | |   |   |        \|        \\       / |       .'  
- *   `._____.'  '(_,_) '---' '---'   `--------``--------` `'-..-'  '-----'`    
- *                                                                           
- *                   +=*          ***	    _______      ____   ,---------. 			              
- *                  *:::*        *=.:*	   /   __  \   .'  __ `.\          \	             
- *                 *.::::+      *:.:::*     | ,_/  \__) /   '  \  \`--.  ,---'         
- *                 +....+*++**++::::::=*  ,-./  )       |___|  /  |   |   \       
- *               *+++=:.:::::.:..:.::::*  \  '_ '`)        _.-`   |   :_ _:            
- *                ++++=--=+=-+:=+++++++=+  > (_)  )  __ .'   _    |   (_I_)        
- *               *:+..##.:++::+++***=++*  (  .  .-'_/  )|  _( )_  |  (_(=)_)   
- *               *..*....-+:::++..#:..=+   `-'`-'     / \ (_ o _) /   (_I_)   
- *               *........+::.+.:++*+..*     `._____.'   '.(_,_).'    '---'
- *               *...*+:.:::::-....:...+           
- *               *....*....:=.....::...**:**=*     
- *               *.....+=...+...-:....-*::+=:+*-*  
- *                +....+**+**+****.:=+*+.=*:=*.:*  
- *              **+....=-:####%:+...*.+::::.*=:*   
- *           *:..=*++=..:+=:::=*....*...*::..:*    
- *         *+.:+......:+.......:+*-:=+.......*     
- *         *.=-........:=............:+:...:**     [ chilled cat warez ]       /\_/\         
- *        *:-=...=...*.++.............*::::*.*     nfo: vibes • meow • zzz    ( o.o )        
- *        *.*....*::.**:.............*-.:::+.*     rel: 1997 // TON forever    > ^ <         
- *        *:=....=**+:...........::..*.....+:*     
- *        **.....+*::=+::.::.....:*:**..:..+:*     
- *        **.....+:-+*:.:+::::**:-=::+.....+:*     
- *
- * =====================================================
- * Chilled Cat Bot
- * Version: 1.3.0
- * Date: 2025-10-01
- *
- * Changelog:
- * v1.3.0 - Added /menu with inline keyboards, cleaned up leaderboard output
- * v1.2.0 - Added group/global leaderboard support with caching
- * v1.1.0 - Integrated PlayFab leaderboards
- * v1.0.0 - Basic game launch (Flappy Cat, CatSweeper)
- * =====================================================
- */
--->
-
 require("dotenv").config();
 const express = require("express");
 const { Telegraf } = require("telegraf");
@@ -110,7 +59,7 @@ bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 bot.command("leaderboard", async (ctx) => {
   const parts = ctx.message.text.split(" ");
   const game = parts[1];
-  const scope = parts[2] || "global"; // new: allow global or group
+  const scope = parts[2] || "global"; // allow global or group
 
   if (!game || !GAMES[game]) {
     return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group]");
@@ -154,7 +103,7 @@ bot.on("callback_query", async (ctx) => {
   url.searchParams.set("message_id", q.message.message_id);
   url.searchParams.set("_ts", Date.now());
 
-  // 🔥 NEW: include Telegram username (or fallback)
+  // include Telegram username (or fallback)
   const tgName = q.from.username || q.from.first_name || "Anonymous";
   url.searchParams.set("username", tgName);
 
