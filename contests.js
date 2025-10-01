@@ -142,11 +142,26 @@ async function startContest(ctx, game, minutes) {
 
 /* End contest manually */
 async function endContest(ctx, game) {
-  const c = contests.get(ctx.chat.id);
-  if (!c || c.game !== game) {
-    return ctx.reply("⚠️ No active contest for this game.");
+  if (!game) {
+    return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
   }
 
+  const c = contests.get(ctx.chat.id);
+
+  if (!c) {
+    return ctx.reply("⚠️ There is no active contest in this group.");
+  }
+
+  if (c.game !== game) {
+    return ctx.reply(`⚠️ The active contest is for *${c.game}*, not ${game}.`, { parse_mode: "Markdown" });
+  }
+
+  if (Date.now() > c.expires) {
+    contests.delete(ctx.chat.id);
+    return ctx.reply(`⚠️ The contest for *${c.game}* has already expired.`, { parse_mode: "Markdown" });
+  }
+
+  // ✅ End the contest
   contests.delete(ctx.chat.id);
 
   try {
