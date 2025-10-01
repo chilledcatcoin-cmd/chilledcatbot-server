@@ -81,8 +81,13 @@ bot.on("callback_query", async (ctx) => {
   url.searchParams.set("message_id", q.message.message_id);
   url.searchParams.set("_ts", Date.now());
 
+  // 🔥 NEW: include Telegram username (or fallback)
+  const tgName = q.from.username || q.from.first_name || "Anonymous";
+  url.searchParams.set("username", tgName);
+
   return ctx.telegram.answerGameQuery(q.id, url.toString());
 });
+
 
 /* -------------------------------
    Webhook Mode (Render)
