@@ -61,13 +61,16 @@ async function sendLeaderboard(ctx, game, scope = "global") {
   if (scope === "group") {
     statName = `${game}_${ctx.chat.id}`;
   } else if (scope === "contest") {
-    const c = contests.get(ctx.chat.id);
-    if (!c || c.game !== game || Date.now() > c.expires) {
-      return ctx.reply("⚠️ No active contest for this game in this group.");
-    }
-    statName = c.contestKey;
-    timeRemaining = c.expires - Date.now();
-  } else if (scope === "global") {
+  const c = contests.get(ctx.chat.id);
+  if (!c || c.game !== game) {
+    return ctx.reply("⚠️ There is no active contest for this game right now.");
+  }
+  if (Date.now() > c.expires) {
+    return ctx.reply("🏁 The contest has ended. Start a new one with /startcontest.");
+  }
+  statName = c.contestKey;
+  timeRemaining = c.expires - Date.now();
+} else if (scope === "global") {
     statName = `${game}_global`;
   } else {
     return ctx.reply("⚠️ Invalid scope. Use: global, group, or contest.");
