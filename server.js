@@ -21,6 +21,32 @@ const GAMES = {
 };
 
 /* -------------------------------
+   Simple cache (per-stat, 30s)
+   ------------------------------- */
+const cache = new Map();
+
+async function getLeaderboardCached(statName) {
+  const cached = cache.get(statName);
+  if (cached && (Date.now() - cached.ts < 30000)) {
+    return cached.data;
+  }
+
+  const resp = await axios.post(
+    `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Server/GetLeaderboard`,
+    {
+      StatisticName: statName,
+      StartPosition: 0,
+      MaxResultsCount: 10,
+    },
+    { headers: { "X-SecretKey": PLAYFAB_DEV_SECRET } }
+  );
+
+  const list = resp.data.data.Leaderboard;
+  cache.set(statName, { ts: Date.now(), data: list });
+  return list;
+}
+
+/* -------------------------------
    Bot commands
    ------------------------------- */
 bot.start((ctx) =>
@@ -33,26 +59,22 @@ bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 bot.command("leaderboard", async (ctx) => {
   const parts = ctx.message.text.split(" ");
   const game = parts[1];
+  const scope = parts[2] || "global"; // new: allow global or group
+
   if (!game || !GAMES[game]) {
-    return ctx.reply("Usage: /leaderboard <flappycat|catsweeper>");
+    return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group]");
   }
 
-  const statName = `${game}_${ctx.chat.id}`;
-  try {
-    const resp = await axios.post(
-      `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Server/GetLeaderboard`,
-      {
-        StatisticName: statName,
-        StartPosition: 0,
-        MaxResultsCount: 10,
-      },
-      { headers: { "X-SecretKey": PLAYFAB_DEV_SECRET } }
-    );
+  // scope selection
+  const statName = scope === "group"
+    ? `${game}_${ctx.chat.id}`
+    : `${game}_global`;
 
-    const list = resp.data.data.Leaderboard;
+  try {
+    const list = await getLeaderboardCached(statName);
     if (!list.length) return ctx.reply("No scores yet 😺");
 
-    let msg = `🏆 Leaderboard — ${game}\n`;
+    let msg = `🏆 Leaderboard — ${game} (${scope})\n`;
     list.forEach((e, i) => {
       const name = e.DisplayName || `Player${i + 1}`;
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
@@ -87,7 +109,6 @@ bot.on("callback_query", async (ctx) => {
 
   return ctx.telegram.answerGameQuery(q.id, url.toString());
 });
-
 
 /* -------------------------------
    Webhook Mode (Render)
