@@ -102,31 +102,17 @@ async function getLeaderboardCached(statName) {
    Bot commands
    ------------------------------- */
 bot.start((ctx) => {
-  ctx.reply("😺 Welcome to *Chilled Cat Games!*\nChoose an option below:", {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "🎮 Play Flappy Cat", callback_game: {}, url: undefined },
-          { text: "💣 Play CatSweeper", callback_game: {}, url: undefined }
-        ],
-        [
-          { text: "🏆 Leaderboards", callback_data: "menu_leaderboards" }
-        ]
-      ]
-    }
-  });
+  ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
+            "🎮 /flappycat — Play Flappy Cat\n" +
+            "💣 /catsweeper — Play CatSweeper\n" +
+            "🏆 /leaderboard <game> [global|group]", 
+            { parse_mode: "Markdown" });
 });
 
-// Simple menu command
 bot.command("menu", (ctx) => {
   ctx.reply("📋 Main Menu", {
     reply_markup: {
       inline_keyboard: [
-        [
-          { text: "🎮 Flappy Cat", callback_game: {}, url: undefined },
-          { text: "💣 CatSweeper", callback_game: {}, url: undefined }
-        ],
         [
           { text: "🏆 FlappyCat Global", callback_data: "lb_flappycat_global" },
           { text: "🏆 FlappyCat Group", callback_data: "lb_flappycat_group" }
@@ -138,7 +124,12 @@ bot.command("menu", (ctx) => {
       ]
     }
   });
+
+  // Send game launchers separately
+  ctx.replyWithGame("flappycat");
+  ctx.replyWithGame("catsweeper");
 });
+
 
 // Legacy text commands (still work)
 bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
