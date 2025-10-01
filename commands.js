@@ -56,6 +56,8 @@ async function sendLeaderboard(ctx, game, scope = "global") {
   }
 
   let statName;
+  let timeRemaining; // track for contest mode
+
   if (scope === "group") {
     statName = `${game}_${ctx.chat.id}`;
   } else if (scope === "contest") {
@@ -64,6 +66,7 @@ async function sendLeaderboard(ctx, game, scope = "global") {
       return ctx.reply("⚠️ No active contest for this game in this group.");
     }
     statName = c.contestKey;
+    timeRemaining = c.expires - Date.now();
   } else if (scope === "global") {
     statName = `${game}_global`;
   } else {
@@ -79,6 +82,14 @@ async function sendLeaderboard(ctx, game, scope = "global") {
       const name = e.DisplayName || `Player${i + 1}`;
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
     });
+
+    // ⏳ Add time remaining for contest scope
+if (scope === "contest" && timeRemaining && timeRemaining > 0) {
+  const mins = Math.floor(timeRemaining / 60000);
+  const secs = Math.floor((timeRemaining % 60000) / 1000);
+  msg += `\n⏳ Time remaining: *${mins}m ${secs}s*`;
+}
+
     ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (e) {
     console.error("Leaderboard error", e.response?.data || e.message);
