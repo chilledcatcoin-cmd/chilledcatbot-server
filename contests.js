@@ -99,19 +99,26 @@ async function startContest(ctx, game, minutes) {
   // ✅ store group title too
   contests.set(ctx.chat.id, { game, contestKey, expires, groupTitle: ctx.chat.title });
 
-  // Map short names to nice titles
-  const gameTitles = {
-    flappycat: "Flappy Cat — A Chilled Cat Game",
-    catsweeper: "CatSweeper ’97 — Minesweeper with Cats"
-  };
+// Map short names to nice titles + their contest command
+const gameTitles = {
+  flappycat: {
+    title: "Flappy Cat — A Chilled Cat Game",
+    contestCmd: "/flappycontest"
+  },
+  catsweeper: {
+    title: "CatSweeper ’97 — Minesweeper with Cats",
+    contestCmd: "/sweepercontest"
+  }
+};
 
-  const niceName = gameTitles[game] || game;
+const niceName = gameTitles[game]?.title || game;
+const contestCmd = gameTitles[game]?.contestCmd || `/${game}contest`;
 
-  ctx.reply(
-    `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
-    `Use /${game}contest to check standings.`,
-    { parse_mode: "Markdown" }
-  );
+ctx.reply(
+  `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
+  `Use ${contestCmd} to check standings.`,
+  { parse_mode: "Markdown" }
+);
 
   // ✅ Send proper game button
   if (game === "flappycat") {
