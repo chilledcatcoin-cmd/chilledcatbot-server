@@ -50,27 +50,30 @@ const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 const { contests, startContest, endContest } = require("./contests");
 
+/* -------------------------------
+   Leaderboard Sender
+   ------------------------------- */
 async function sendLeaderboard(ctx, game, scope = "global") {
   if (!game || !GAMES[game]) {
     return ctx.reply("Usage: /leaderboard <flappycat|catsweeper> [global|group|contest]");
   }
 
   let statName;
-  let timeRemaining; // track for contest mode
+  let timeRemaining;
 
   if (scope === "group") {
     statName = `${game}_${ctx.chat.id}`;
   } else if (scope === "contest") {
-  const c = contests.get(ctx.chat.id);
-  if (!c || c.game !== game) {
-    return ctx.reply("⚠️ There is no active contest for this game right now.");
-  }
-  if (Date.now() > c.expires) {
-    return ctx.reply("🏁 The contest has ended. Start a new one with /startcontest.");
-  }
-  statName = c.contestKey;
-  timeRemaining = c.expires - Date.now();
-} else if (scope === "global") {
+    const c = contests.get(ctx.chat.id);
+    if (!c || c.game !== game) {
+      return ctx.reply("⚠️ There is no active contest for this game right now.");
+    }
+    if (Date.now() > c.expires) {
+      return ctx.reply("🏁 The contest has ended. Start a new one with /startcontest.");
+    }
+    statName = c.contestKey;
+    timeRemaining = c.expires - Date.now();
+  } else if (scope === "global") {
     statName = `${game}_global`;
   } else {
     return ctx.reply("⚠️ Invalid scope. Use: global, group, or contest.");
@@ -86,12 +89,12 @@ async function sendLeaderboard(ctx, game, scope = "global") {
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
     });
 
-    // ⏳ Add time remaining for contest scope
-if (scope === "contest" && timeRemaining && timeRemaining > 0) {
-  const mins = Math.floor(timeRemaining / 60000);
-  const secs = Math.floor((timeRemaining % 60000) / 1000);
-  msg += `\n⏳ Time remaining: *${mins}m ${secs}s*`;
-}
+    // show time left in contest
+    if (scope === "contest" && timeRemaining > 0) {
+      const mins = Math.floor(timeRemaining / 60000);
+      const secs = Math.floor((timeRemaining % 60000) / 1000);
+      msg += `\n⏳ Time remaining: *${mins}m ${secs}s*`;
+    }
 
     ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (e) {
@@ -100,6 +103,9 @@ if (scope === "contest" && timeRemaining && timeRemaining > 0) {
   }
 }
 
+/* -------------------------------
+   Commands Setup
+   ------------------------------- */
 function setupCommands(bot) {
   bot.start((ctx) => {
     ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
@@ -107,7 +113,9 @@ function setupCommands(bot) {
       "💣 /catsweeper — Play CatSweeper\n" +
       "🏆 /leaderboard <game> [global|group|contest]\n" +
       "🎯 /startcontest <game> <minutes>\n" +
-      "🏁 /endcontest <game>",
+      "🏁 /endcontest <game>\n" +
+      "📊 /flappycontest — View Flappy Cat contest\n" +
+      "📊 /sweepercontest — View CatSweeper contest",
       { parse_mode: "Markdown" });
   });
 
@@ -125,51 +133,76 @@ function setupCommands(bot) {
   // Short leaderboard commands
   bot.command("flappyglobal", (ctx) => sendLeaderboard(ctx, "flappycat", "global"));
   bot.command("flappygroup", (ctx) => sendLeaderboard(ctx, "flappycat", "group"));
-  bot.command("flappycontest", (ctx) => sendLeaderboard(ctx, "flappycat", "contest"));
+
+  bot.command("flappycontest", async (ctx) => {
+    // show contest for this group
+    await sendLeaderboard(ctx, "flappycat", "contest");
+
+    // also list other active contests
+    let msg = "\n📢 Active contests in other groups:\n";
+    let found = false;
+    contests.forEach((c, chatId) => {
+      if (c.game === "flappycat" && chatId !== ctx.chat.id && Date.now() < c.expires) {
+        const mins = Math.ceil((c.expires - Date.now()) / 60000);
+        msg += `- ${c.groupTitle || "Group"} (${mins}m left)\n`;
+        found = true;
+      }
+    });
+    if (found) ctx.reply(msg);
+  });
 
   bot.command("sweeperglobal", (ctx) => sendLeaderboard(ctx, "catsweeper", "global"));
   bot.command("sweepergroup", (ctx) => sendLeaderboard(ctx, "catsweeper", "group"));
-  bot.command("sweepercontest", (ctx) => sendLeaderboard(ctx, "catsweeper", "contest"));
+
+  bot.command("sweepercontest", async (ctx) => {
+    await sendLeaderboard(ctx, "catsweeper", "contest");
+
+    let msg = "\n📢 Active contests in other groups:\n";
+    let found = false;
+    contests.forEach((c, chatId) => {
+      if (c.game === "catsweeper" && chatId !== ctx.chat.id && Date.now() < c.expires) {
+        const mins = Math.ceil((c.expires - Date.now()) / 60000);
+        msg += `- ${c.groupTitle || "Group"} (${mins}m left)\n`;
+        found = true;
+      }
+    });
+    if (found) ctx.reply(msg);
+  });
 
   /* -------------------------------
      Contest Commands
      ------------------------------- */
   bot.command("startcontest", async (ctx) => {
+    if (ctx.chat.type === "private") {
+      return ctx.reply("⚠️ Contests can only be started in groups.");
+    }
+
     const parts = ctx.message.text.split(" ");
     const game = parts[1];
     const minutes = parseInt(parts[2] || "30"); // default 30m
 
-    if (ctx.chat.type.endsWith("group")) {
-      try {
-        const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-        if (member.status !== "administrator" && member.status !== "creator") {
-          return ctx.reply("⚠️ Only group admins can start contests.");
-        }
-      } catch (err) {
-        console.error("Admin check failed:", err);
-        return ctx.reply("⚠️ Could not verify admin rights.");
+    // Admin check
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      if (member.status !== "administrator" && member.status !== "creator") {
+        return ctx.reply("⚠️ Only group admins can start contests.");
       }
+    } catch (err) {
+      console.error("Admin check failed:", err);
+      return ctx.reply("⚠️ Could not verify admin rights.");
     }
 
-    startContest(ctx, game, minutes);
+    // pass group title to contests.js
+    startContest(ctx, game, minutes, ctx.chat.title);
   });
 
   bot.command("endcontest", async (ctx) => {
-    const parts = ctx.message.text.split(" ");
-    const game = parts[1];
-
-    if (ctx.chat.type.endsWith("group")) {
-      try {
-        const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-        if (member.status !== "administrator" && member.status !== "creator") {
-          return ctx.reply("⚠️ Only group admins can end contests.");
-        }
-      } catch (err) {
-        console.error("Admin check failed:", err);
-        return ctx.reply("⚠️ Could not verify admin rights.");
-      }
+    if (ctx.chat.type === "private") {
+      return ctx.reply("⚠️ Contests can only be ended in groups.");
     }
 
+    const parts = ctx.message.text.split(" ");
+    const game = parts[1];
     endContest(ctx, game);
   });
 

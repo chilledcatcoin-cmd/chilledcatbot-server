@@ -48,7 +48,7 @@
 const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 
-const contests = new Map(); // key: chat_id, value: { game, contestKey, expires }
+const contests = new Map(); // key: chat_id, value: { game, contestKey, expires, groupTitle }
 
 /* Utility: make unique contest key */
 function makeContestKey(game, chatId) {
@@ -56,8 +56,10 @@ function makeContestKey(game, chatId) {
 }
 
 /* Format leaderboard nicely */
-function formatLeaderboard(game, scope, list, timeRemaining = null, final = false) {
-  let msg = `🏆 *${game} Leaderboard* (${scope})\n\n`;
+function formatLeaderboard(game, scope, list, timeRemaining = null, final = false, groupTitle = null) {
+  let header = `🏆 *${game} Leaderboard* (${scope})`;
+  if (groupTitle) header += `\n📌 Group: ${groupTitle}`;
+  let msg = `${header}\n\n`;
 
   list.forEach((e, i) => {
     let name = e.DisplayName || `Player${i + 1}`;
@@ -73,7 +75,9 @@ function formatLeaderboard(game, scope, list, timeRemaining = null, final = fals
   });
 
   if (timeRemaining) {
-    msg += `\n⏳ Time remaining: *${Math.ceil(timeRemaining / 60000)}m*`;
+    const mins = Math.floor(timeRemaining / 60000);
+    const secs = Math.floor((timeRemaining % 60000) / 1000);
+    msg += `\n⏳ Time remaining: *${mins}m ${secs}s*`;
   }
 
   if (final) {
@@ -92,28 +96,29 @@ async function startContest(ctx, game, minutes) {
   const contestKey = makeContestKey(game, ctx.chat.id);
   const expires = Date.now() + minutes * 60 * 1000;
 
-  contests.set(ctx.chat.id, { game, contestKey, expires });
+  // ✅ store group title too
+  contests.set(ctx.chat.id, { game, contestKey, expires, groupTitle: ctx.chat.title });
 
-// Map short names to nice titles
-const gameTitles = {
-  flappycat: "Flappy Cat — A Chilled Cat Game",
-  catsweeper: "CatSweeper ’97 — Minesweeper with Cats"
-};
+  // Map short names to nice titles
+  const gameTitles = {
+    flappycat: "Flappy Cat — A Chilled Cat Game",
+    catsweeper: "CatSweeper ’97 — Minesweeper with Cats"
+  };
 
-const niceName = gameTitles[game] || game;
+  const niceName = gameTitles[game] || game;
 
-ctx.reply(
-  `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
-  `Use /${game}contest to check standings.`,
-  { parse_mode: "Markdown" }
-);
+  ctx.reply(
+    `🎉 Contest started for *${niceName}*! Runs for ${minutes} minutes.\n` +
+    `Use /${game}contest to check standings.`,
+    { parse_mode: "Markdown" }
+  );
 
-// ✅ Send proper game button
-if (game === "flappycat") {
-  ctx.replyWithGame("flappycat");
-} else if (game === "catsweeper") {
-  ctx.replyWithGame("catsweeper");
-}
+  // ✅ Send proper game button
+  if (game === "flappycat") {
+    ctx.replyWithGame("flappycat");
+  } else if (game === "catsweeper") {
+    ctx.replyWithGame("catsweeper");
+  }
 
   // Schedule auto-post updates (4x during contest)
   const intervalMs = (minutes * 60 * 1000) / 4;
@@ -126,7 +131,7 @@ if (game === "flappycat") {
         const list = await getLeaderboardCached(c.contestKey);
         if (list.length) {
           const timeRemaining = c.expires - Date.now();
-          const msg = formatLeaderboard(game, "contest", list, timeRemaining, false);
+          const msg = formatLeaderboard(game, "contest", list, timeRemaining, false, c.groupTitle);
           ctx.reply(msg, { parse_mode: "Markdown" });
         }
       } catch (err) {
@@ -144,7 +149,7 @@ if (game === "flappycat") {
       try {
         const list = await getLeaderboardCached(contestKey);
         if (list.length) {
-          const msg = formatLeaderboard(game, "contest", list, null, true);
+          const msg = formatLeaderboard(game, "contest", list, null, true, c.groupTitle);
           ctx.reply(msg, { parse_mode: "Markdown" });
         } else {
           ctx.reply(`🏁 Contest for *${game}* ended. No scores recorded.`, { parse_mode: "Markdown" });
@@ -184,7 +189,7 @@ async function endContest(ctx, game) {
   try {
     const list = await getLeaderboardCached(c.contestKey);
     if (list.length) {
-      const msg = formatLeaderboard(game, "contest", list, null, true);
+      const msg = formatLeaderboard(game, "contest", list, null, true, c.groupTitle);
       ctx.reply(msg, { parse_mode: "Markdown" });
     } else {
       ctx.reply(`🏁 Contest for *${game}* ended. No scores recorded.`, { parse_mode: "Markdown" });
