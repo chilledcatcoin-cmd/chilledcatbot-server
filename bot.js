@@ -59,3 +59,37 @@ setupCommands(bot);
 setupContests(bot);
 
 module.exports = { bot };
+
+
+
+
+// Simple in-memory log for now
+const fs = require("fs");
+const path = require("path");
+
+const logFile = path.join(__dirname, "chatlog.txt");
+
+// Middleware to log every message/chat
+bot.use((ctx, next) => {
+  if (ctx.chat && ctx.message) {
+    const info = {
+      id: ctx.chat.id,
+      type: ctx.chat.type,
+      title: ctx.chat.title || "",
+      username: ctx.chat.username || "",
+      first_name: ctx.chat.first_name || "",
+      last_name: ctx.chat.last_name || "",
+      text: ctx.message.text || "",
+      date: new Date().toISOString(),
+    };
+
+    const line = `[${info.date}] ChatID: ${info.id}, Type: ${info.type}, ` +
+                 `Title: ${info.title}, User: ${info.username || info.first_name || info.last_name}, ` +
+                 `Msg: ${info.text}\n`;
+
+    fs.appendFileSync(logFile, line);
+    console.log("📝 Logged:", line.trim());
+  }
+  return next();
+});
+
