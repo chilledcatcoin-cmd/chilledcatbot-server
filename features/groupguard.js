@@ -50,6 +50,24 @@
  *  Usage:
  *    Add group IDs and admin user IDs to /config/whitelist.json
  *    Restart bot (or reload) to apply changes.
+ *
+ * ChilledCatBot - Whitelist Config - whitelist.json - Group/User whitelist (Where JSON very strict, cannot add comments, need for my own memory)
+ * Version: 1.0.0
+ * Date: 2025-10-03
+ *
+ * Changelog:
+ * v1.0.0 - Created.
+ *
+ *  groups: List of Telegram group/supergroup IDs the bot is
+ *          allowed to stay in. All others will be left.
+ *
+ *  users:  List of Telegram user IDs who are authorized to run
+ *          admin-only commands (besides OWNER_ID from .env).
+ *
+ *  NOTE: You can get IDs by using:
+ *        - /whereami (group ID)
+ *        - /whoami (your own ID)
+ *        - /whois <id> (lookup someone else)
  * =====================================================
  */
 
