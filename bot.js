@@ -65,6 +65,13 @@ setupLogging(bot);
 
 module.exports = { bot };
 
+bot.on("text", async (ctx, next) => {
+  if (ctx.message.text.startsWith("/")) {
+    return ctx.reply("🚫 You are not authorized to use this command.");
+  }
+  return next();
+});
+
 
 
 

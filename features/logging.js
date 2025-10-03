@@ -34,14 +34,18 @@
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
- * ChilledCatBot - Group Guard - logging.js - Error logs and channel logs.
+ * ChilledCatBot - Bot Logging - logging.js - Error logs and channel logs.
  * Version: 1.0.0
  * Date: 2025-10-03
  *
  * Changelog:
  * v1.0.0 - Created, message logs, join/leaves logs, error logs and admin commands.
  *
- *  
+ *  /logstatus → show current logging settings and groups
+ *  /logon <messages|joins|errors|admin> → turn a logging type ON
+ *  /logoff <messages|joins|errors|admin> → turn a logging type OFF
+ *  /loggroupadd <group_id> → add a group to the logging whitelist
+ *  /loggroupremove <group_id> → remove a group from the logging whitelist
  * =====================================================
  */
 
@@ -120,7 +124,9 @@ function setupLogging(bot) {
   bot.command(["logon", "logoff"], async (ctx) => {
     const userId = ctx.from.id.toString();
     const ownerId = (process.env.OWNER_ID || "").toString();
-    if (userId !== ownerId) return ctx.reply("🚫 Unauthorized");
+    if (userId !== ownerId) {
+  return ctx.reply("🚫 You are not authorized to use this command.");
+}
 
     const parts = ctx.message.text.split(" ");
     if (parts.length < 2) {
