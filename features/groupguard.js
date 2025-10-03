@@ -144,26 +144,35 @@ function setupGroupGuard(bot) {
     await ctx.reply(`👤 Your Info:\n\n🆔 ID: ${userId}\n📛 Name: ${firstName}\n🔗 Username: ${username}`);
   });
 
-  // 👑 Admin: /whois <id>
   bot.command("whois", async (ctx) => {
     const ownerId = process.env.OWNER_ID;
     const userId = ctx.from.id.toString();
+
     if (userId !== ownerId && !whitelist.users.map(String).includes(userId)) {
       return ctx.reply("🚫 You are not authorized to use this command.");
     }
 
     const args = ctx.message.text.split(" ").slice(1);
-    if (args.length < 1) return ctx.reply("❓ Usage: /whois <user_id>");
+    if (args.length < 1) {
+      return ctx.reply("❓ Usage: /whois <user_id | @username>");
+    }
 
-    const targetId = args[0].trim();
+    const target = args[0].trim();
+
     try {
-      const chat = await bot.telegram.getChat(targetId);
+      // Accept numeric IDs or @usernames
+      const chat = await bot.telegram.getChat(target);
+
       await ctx.reply(
-        `👤 User Info:\n\n🆔 ID: ${chat.id}\n📛 Name: ${chat.first_name || ""} ${chat.last_name || ""}\n🔗 Username: ${chat.username || "(none)"}\n👥 Type: ${chat.type}`
+        `👤 User Info:\n\n` +
+        `🆔 ID: ${chat.id}\n` +
+        `📛 Name: ${chat.first_name || ""} ${chat.last_name || ""}\n` +
+        `🔗 Username: ${chat.username ? `@${chat.username}` : "(none)"}\n` +
+        `👥 Type: ${chat.type}`
       );
     } catch (err) {
       console.error("Error in /whois:", err);
-      await ctx.reply(`❌ Could not fetch info for ID ${targetId}`);
+      await ctx.reply(`❌ Could not fetch info for ${target}`);
     }
   });
 }
