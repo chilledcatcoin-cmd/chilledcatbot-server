@@ -88,6 +88,17 @@ function loadWhitelist() {
 }
 loadWhitelist();
 
+// 🔑 Centralized admin check
+function isAdmin(ctx) {
+  const userId = ctx.from.id.toString();
+  const ownerId = (process.env.OWNER_ID || "").toString();
+  const allowedUsers = (whitelist.users || []).map(String);
+
+  const ok = userId === ownerId || allowedUsers.includes(userId);
+  console.log("🔐 Admin check:", { userId, ownerId, allowedUsers, ok });
+  return ok;
+}
+
 function setupGroupGuard(bot) {
   // 🔒 Middleware: restrict groups
   bot.use(async (ctx, next) => {
@@ -115,10 +126,7 @@ function setupGroupGuard(bot) {
 
   // 👑 Admin command: /listgroups
   bot.command("listgroups", async (ctx) => {
-    const ownerId = process.env.OWNER_ID;
-    const userId = ctx.from.id.toString();
-
-    if (userId !== ownerId && !whitelist.users.map(String).includes(userId)) {
+    if (!isAdmin(ctx)) {
       return ctx.reply("🚫 You are not authorized to use this command.");
     }
 
@@ -144,11 +152,9 @@ function setupGroupGuard(bot) {
     await ctx.reply(`👤 Your Info:\n\n🆔 ID: ${userId}\n📛 Name: ${firstName}\n🔗 Username: ${username}`);
   });
 
+  // 👑 Admin: /whois
   bot.command("whois", async (ctx) => {
-    const ownerId = process.env.OWNER_ID;
-    const userId = ctx.from.id.toString();
-
-    if (userId !== ownerId && !whitelist.users.map(String).includes(userId)) {
+    if (!isAdmin(ctx)) {
       return ctx.reply("🚫 You are not authorized to use this command.");
     }
 
@@ -158,11 +164,8 @@ function setupGroupGuard(bot) {
     }
 
     const target = args[0].trim();
-
     try {
-      // Accept numeric IDs or @usernames
       const chat = await bot.telegram.getChat(target);
-
       await ctx.reply(
         `👤 User Info:\n\n` +
         `🆔 ID: ${chat.id}\n` +
