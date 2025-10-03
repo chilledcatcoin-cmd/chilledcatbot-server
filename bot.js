@@ -35,10 +35,11 @@
  *
  * =====================================================
  * ChilledCatBot - Bot Loader - bot.js - Initializes Telegraf + loads modules
- * Version: 1.4.0
- * Date: 2025-10-01
+ * Version: 1.5.0
+ * Date: 2025-10-03
  *
  * Changelog:
+ * v1.5.0 - Added logging
  * v1.4.0 - Modularized: bot.js attaches commands, games, contests
  * v1.3.0 - Added /menu support
  * v1.0.0 - Initial Telegraf setup
@@ -49,6 +50,7 @@ const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
 const { setupContests } = require("./contests");
 const { setupGroupGuard } = require("./features/groupguard");
+const { setupLogging } = require("./features/logging");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
@@ -59,6 +61,7 @@ const bot = new Telegraf(BOT_TOKEN);
 setupCommands(bot);
 setupContests(bot);
 setupGroupGuard(bot);
+setupLogging(bot);
 
 module.exports = { bot };
 
