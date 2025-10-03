@@ -74,4 +74,56 @@ function setupGroupGuard(bot) {
   });
 }
 
+  // Utility command: /whoami (anyone can use in DM or groups)
+  bot.command("whoami", async (ctx) => {
+    const userId = ctx.from?.id?.toString();
+    const username = ctx.from?.username ? `@${ctx.from.username}` : "(no username)";
+    const firstName = ctx.from?.first_name || "";
+
+    let msg = `👤 Your Info:\n\n`;
+    msg += `🆔 ID: ${userId}\n`;
+    msg += `📛 Name: ${firstName}\n`;
+    msg += `🔗 Username: ${username}`;
+
+    await ctx.reply(msg);
+  });
+
+  // Admin-only command: /whois <id>
+  bot.command("whois", async (ctx) => {
+    const ownerId = process.env.OWNER_ID;
+    const userId = ctx.from.id.toString();
+
+    // Only OWNER or whitelisted admin users can use this
+    if (userId !== ownerId && !whitelist.users.map(String).includes(userId)) {
+      return ctx.reply("🚫 You are not authorized to use this command.");
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length < 1) {
+      return ctx.reply("❓ Usage: /whois <user_id>");
+    }
+
+    const targetId = args[0].trim();
+
+    try {
+      const user = await bot.telegram.getChat(targetId);
+      const username = user.username ? `@${user.username}` : "(no username)";
+      const firstName = user.first_name || "";
+      const lastName = user.last_name || "";
+
+      let msg = `👤 User Info:\n\n`;
+      msg += `🆔 ID: ${user.id}\n`;
+      msg += `📛 Name: ${firstName} ${lastName}\n`;
+      msg += `🔗 Username: ${username}\n`;
+      msg += `👥 Type: ${user.type || "user"}`;
+
+      await ctx.reply(msg);
+    } catch (err) {
+      console.error("Error in /whois:", err);
+      await ctx.reply(`❌ Could not fetch info for ID ${targetId}`);
+    }
+  });
+
+
+
 module.exports = { setupGroupGuard, loadWhitelist };
