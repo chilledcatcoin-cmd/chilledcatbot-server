@@ -153,31 +153,39 @@ function setupGroupGuard(bot) {
   });
 
   // 👑 Admin: /whois
-  bot.command("whois", async (ctx) => {
-    if (!isAdmin(ctx)) {
-      return ctx.reply("🚫 You are not authorized to use this command.");
-    }
+bot.command("whois", async (ctx) => {
+  if (!isAdmin(ctx)) {
+    return ctx.reply("🚫 You are not authorized to use this command.");
+  }
 
+  let target = null;
+
+  // If command is a reply
+  if (ctx.message.reply_to_message) {
+    target = ctx.message.reply_to_message.from.id.toString();
+  } else {
     const args = ctx.message.text.split(" ").slice(1);
     if (args.length < 1) {
-      return ctx.reply("❓ Usage: /whois <user_id | @username>");
+      return ctx.reply("❓ Usage: reply to a message with /whois OR /whois <user_id | @username>");
     }
+    target = args[0].trim();
+  }
 
-    const target = args[0].trim();
-    try {
-      const chat = await bot.telegram.getChat(target);
-      await ctx.reply(
-        `👤 User Info:\n\n` +
-        `🆔 ID: ${chat.id}\n` +
-        `📛 Name: ${chat.first_name || ""} ${chat.last_name || ""}\n` +
-        `🔗 Username: ${chat.username ? `@${chat.username}` : "(none)"}\n` +
-        `👥 Type: ${chat.type}`
-      );
-    } catch (err) {
-      console.error("Error in /whois:", err);
-      await ctx.reply(`❌ Could not fetch info for ${target}`);
-    }
-  });
+  try {
+    const chat = await bot.telegram.getChat(target);
+    await ctx.reply(
+      `👤 User Info:\n\n` +
+      `🆔 ID: ${chat.id}\n` +
+      `📛 Name: ${chat.first_name || ""} ${chat.last_name || ""}\n` +
+      `🔗 Username: ${chat.username ? `@${chat.username}` : "(none)"}\n` +
+      `👥 Type: ${chat.type}`
+    );
+  } catch (err) {
+    console.error("Error in /whois:", err);
+    await ctx.reply(`❌ Could not fetch info for ${target}`);
+  }
+});
+
 }
 
 module.exports = { setupGroupGuard, loadWhitelist };
