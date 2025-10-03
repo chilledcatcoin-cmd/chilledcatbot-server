@@ -2,43 +2,48 @@
 const fs = require("fs");
 const path = require("path");
 
-// Load whitelist JSON from /config
 const whitelistPath = path.join(__dirname, "..", "config", "whitelist.json");
 let whitelist = { groups: [], users: [] };
 
-try {
-  const raw = fs.readFileSync(whitelistPath, "utf8");
-  whitelist = JSON.parse(raw);
-  console.log("✅ Whitelist loaded:", whitelist);
-} catch (err) {
-  console.error("❌ Failed to load whitelist.json:", err);
+function loadWhitelist() {
+  try {
+    const raw = fs.readFileSync(whitelistPath, "utf8");
+    whitelist = JSON.parse(raw);
+    console.log("✅ Whitelist loaded:", whitelist);
+  } catch (err) {
+    console.error("❌ Failed to load whitelist.json:", err);
+  }
 }
 
-function setupGroupGuard(bot) {
-  const allowedGroups = whitelist.groups.map(String);
-  const allowedUsers = whitelist.users.map(String);
+// Load at startup
+loadWhitelist();
 
-  // Enforce whitelist on ALL messages/events
+function setupGroupGuard(bot) {
   bot.use(async (ctx, next) => {
-    const chatId = ctx.chat?.id?.toString();
+    if (!ctx.chat) return next(); // ignore weird updates
+
+    const chatId = ctx.chat.id.toString();
     const userId = ctx.from?.id?.toString();
 
-    if (!chatId) return next();
-
-    // Private chat check
+    // 🔒 PRIVATE CHAT CHECK
     if (ctx.chat.type === "private") {
-      if (!allowedUsers.includes(userId)) {
-        console.log(`❌ Unauthorized user DM: ${userId}`);
-        return ctx.reply("🚫 You are not authorized to use ChilledCatBot.");
+      if (!whitelist.users.map(String).includes(userId)) {
+        console.log(`❌ Unauthorized DM from ${userId}`);
+        try {
+          await ctx.reply("🚫 You are not authorized to use ChilledCatBot.");
+        } catch (err) {
+          console.error("Error replying to unauthorized DM:", err);
+        }
+        return; // ❌ block here (don’t call next)
       }
-      return next();
+      return next(); // ✅ allow whitelisted user
     }
 
-    // Group check
+    // 🔒 GROUP / SUPERGROUP CHECK
     if ((ctx.chat.type === "group" || ctx.chat.type === "supergroup") &&
-        !allowedGroups.includes(chatId)) {
+        !whitelist.groups.map(String).includes(chatId)) {
       try {
-        await ctx.reply("🚫 This group is not whitelisted. ChilledCatBot will leave.");
+        await ctx.reply("🚫 This group is not whitelisted. Leaving now.");
         await ctx.leaveChat();
         console.log(`❌ Left unauthorized group: ${chatId}`);
       } catch (err) {
@@ -47,15 +52,8 @@ function setupGroupGuard(bot) {
       return;
     }
 
-    return next();
-  });
-
-  // Log membership status changes
-  bot.on("my_chat_member", (ctx) => {
-    const chatId = ctx.chat.id.toString();
-    const status = ctx.update.my_chat_member.new_chat_member.status;
-    console.log(`ℹ️ Membership change in ${chatId}: ${status}`);
+    return next(); // ✅ allow normal flow
   });
 }
 
-module.exports = { setupGroupGuard };
+module.exports = { setupGroupGuard, loadWhitelist };
