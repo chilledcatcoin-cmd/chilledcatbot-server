@@ -53,6 +53,7 @@ const { setupGroupGuard } = require("./features/groupguard");
 const { setupLogging } = require("./features/logging");
 const { setupFortune } = require("./fortune");
 const { setupChillOrChaos } = require("./CoC");
+const { setupHowChill } = require("./features/howchill");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
@@ -66,6 +67,7 @@ setupGroupGuard(bot);
 setupLogging(bot);
 setupFortune(bot);
 setupChillOrChaos(bot);
+setupHowChill(bot);
 
 module.exports = { bot };
 

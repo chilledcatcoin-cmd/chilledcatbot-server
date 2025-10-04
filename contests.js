@@ -208,21 +208,28 @@ async function endContest(ctx, game) {
 }
 
 /* Wire contest commands into the bot */
+const { isWhitelisted } = require("./config/whitelist");
+
 function setupContests(bot) {
   bot.command("startcontest", async (ctx) => {
     try {
-      // Block in private chats
       if (ctx.chat.type === "private")
         return ctx.reply("🚫 This command only works in group chats.");
 
       const member = await ctx.getChatMember(ctx.from.id);
-      if (!["creator", "administrator"].includes(member.status)) {
-        return ctx.reply("🚫 Only group admins can start contests.");
+      const userId = ctx.from.id;
+
+      // ✅ allow group admins OR whitelisted users
+      if (
+        !["creator", "administrator"].includes(member.status) &&
+        !isWhitelisted(userId)
+      ) {
+        return ctx.reply("🚫 Only group admins or whitelisted users can start contests.");
       }
 
       const parts = ctx.message.text.split(" ");
       const game = parts[1];
-      const minutes = parseInt(parts[2] || "10"); // default 10 minutes
+      const minutes = parseInt(parts[2] || "10");
       await startContest(ctx, game, minutes);
     } catch (err) {
       console.error(err);
@@ -236,8 +243,13 @@ function setupContests(bot) {
         return ctx.reply("🚫 This command only works in group chats.");
 
       const member = await ctx.getChatMember(ctx.from.id);
-      if (!["creator", "administrator"].includes(member.status)) {
-        return ctx.reply("🚫 Only group admins can end contests.");
+      const userId = ctx.from.id;
+
+      if (
+        !["creator", "administrator"].includes(member.status) &&
+        !isWhitelisted(userId)
+      ) {
+        return ctx.reply("🚫 Only group admins or whitelisted users can end contests.");
       }
 
       const parts = ctx.message.text.split(" ");
