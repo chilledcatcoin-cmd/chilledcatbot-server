@@ -210,17 +210,44 @@ async function endContest(ctx, game) {
 /* Wire contest commands into the bot */
 function setupContests(bot) {
   bot.command("startcontest", async (ctx) => {
-    const parts = ctx.message.text.split(" ");
-    const game = parts[1];
-    const minutes = parseInt(parts[2] || "10"); // default 10 minutes
-    await startContest(ctx, game, minutes);
+    try {
+      // Block in private chats
+      if (ctx.chat.type === "private")
+        return ctx.reply("🚫 This command only works in group chats.");
+
+      const member = await ctx.getChatMember(ctx.from.id);
+      if (!["creator", "administrator"].includes(member.status)) {
+        return ctx.reply("🚫 Only group admins can start contests.");
+      }
+
+      const parts = ctx.message.text.split(" ");
+      const game = parts[1];
+      const minutes = parseInt(parts[2] || "10"); // default 10 minutes
+      await startContest(ctx, game, minutes);
+    } catch (err) {
+      console.error(err);
+      ctx.reply("⚠️ Unable to start contest. Please try again.");
+    }
   });
 
   bot.command("endcontest", async (ctx) => {
-    const parts = ctx.message.text.split(" ");
-    const game = parts[1];
-    if (!game) return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
-    await endContest(ctx, game);
+    try {
+      if (ctx.chat.type === "private")
+        return ctx.reply("🚫 This command only works in group chats.");
+
+      const member = await ctx.getChatMember(ctx.from.id);
+      if (!["creator", "administrator"].includes(member.status)) {
+        return ctx.reply("🚫 Only group admins can end contests.");
+      }
+
+      const parts = ctx.message.text.split(" ");
+      const game = parts[1];
+      if (!game) return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
+      await endContest(ctx, game);
+    } catch (err) {
+      console.error(err);
+      ctx.reply("⚠️ Unable to end contest. Please try again.");
+    }
   });
 }
 
