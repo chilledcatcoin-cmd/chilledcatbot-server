@@ -106,6 +106,7 @@ async function sendLeaderboard(ctx, game, scope = "global") {
 /* -------------------------------
    Commands Setup
    ------------------------------- */
+function setupCommands(bot) {
   bot.start((ctx) => {
     ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
       "🎮 /flappycat — Play Flappy Cat\n" +
@@ -131,10 +132,7 @@ async function sendLeaderboard(ctx, game, scope = "global") {
     }
 
     try {
-      // delete the command itself if possible
       await ctx.deleteMessage(ctx.message.message_id).catch(() => {});
-
-      // send a flood of blank lines to simulate a cleared screen
       const lines = Array(50).fill("‎ ").join("\n");
       await ctx.reply(`🧹 Clearing your screen...\n${lines}\n✨ All clean!`);
     } catch (err) {
@@ -142,7 +140,6 @@ async function sendLeaderboard(ctx, game, scope = "global") {
       await ctx.reply("⚠️ Could not clear messages.");
     }
   });
-
   // General leaderboard
   bot.command("leaderboard", async (ctx) => {
     const parts = ctx.message.text.split(" ");
