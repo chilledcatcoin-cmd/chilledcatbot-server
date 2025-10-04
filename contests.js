@@ -216,14 +216,7 @@ function setupContests(bot) {
       if (ctx.chat.type === "private")
         return ctx.reply("🚫 This command only works in group chats.");
 
-      const member = await ctx.getChatMember(ctx.from.id);
-      const userId = ctx.from.id;
-
-      // ✅ allow group admins OR whitelisted users
-      if (
-        !["creator", "administrator"].includes(member.status) &&
-        !isWhitelisted(userId)
-      ) {
+      if (!(await userCanManageContests(ctx))) {
         return ctx.reply("🚫 Only group admins or whitelisted users can start contests.");
       }
 
@@ -242,13 +235,7 @@ function setupContests(bot) {
       if (ctx.chat.type === "private")
         return ctx.reply("🚫 This command only works in group chats.");
 
-      const member = await ctx.getChatMember(ctx.from.id);
-      const userId = ctx.from.id;
-
-      if (
-        !["creator", "administrator"].includes(member.status) &&
-        !isWhitelisted(userId)
-      ) {
+      if (!(await userCanManageContests(ctx))) {
         return ctx.reply("🚫 Only group admins or whitelisted users can end contests.");
       }
 
