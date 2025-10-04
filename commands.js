@@ -106,7 +106,6 @@ async function sendLeaderboard(ctx, game, scope = "global") {
 /* -------------------------------
    Commands Setup
    ------------------------------- */
-function setupCommands(bot) {
   bot.start((ctx) => {
     ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
       "🎮 /flappycat — Play Flappy Cat\n" +
@@ -115,12 +114,34 @@ function setupCommands(bot) {
       "🎯 /startcontest <game> <minutes>\n" +
       "🏁 /endcontest <game>\n" +
       "📊 /flappycontest — View Flappy Cat contest\n" +
-      "📊 /sweepercontest — View CatSweeper contest",
+      "📊 /sweepercontest — View CatSweeper contest\n" +
+      "🧹 /clear — Clear the chat (DM only)",
       { parse_mode: "Markdown" });
   });
 
   bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
   bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
+
+  /* -------------------------------
+     Clear Chat (DM only)
+     ------------------------------- */
+  bot.command("clear", async (ctx) => {
+    if (ctx.chat.type !== "private") {
+      return ctx.reply("🚫 The /clear command is only available in direct messages with me.");
+    }
+
+    try {
+      // delete the command itself if possible
+      await ctx.deleteMessage(ctx.message.message_id).catch(() => {});
+
+      // send a flood of blank lines to simulate a cleared screen
+      const lines = Array(50).fill("‎ ").join("\n");
+      await ctx.reply(`🧹 Clearing your screen...\n${lines}\n✨ All clean!`);
+    } catch (err) {
+      console.error("Clear command error:", err);
+      await ctx.reply("⚠️ Could not clear messages.");
+    }
+  });
 
   // General leaderboard
   bot.command("leaderboard", async (ctx) => {
