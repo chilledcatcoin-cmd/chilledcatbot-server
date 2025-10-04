@@ -207,63 +207,20 @@ async function endContest(ctx, game) {
   }
 }
 
-
-function isWhitelisted(userId) {
-  const list = loadWhitelist();
-  const numeric = Number(userId);
-  const result = list.includes(numeric);
-
-  console.log("🔍 [Whitelist Debug]");
-  console.log("User ID:", userId, "Numeric:", numeric);
-  console.log("Loaded List:", list);
-  console.log("Matched:", result);
-  console.log("Whitelist file path:", filePath);
-
-  return result;
-}
-
-
-
 /* Wire contest commands into the bot */
-const { isWhitelisted } = require("./config/whitelist");
-
 function setupContests(bot) {
   bot.command("startcontest", async (ctx) => {
-    try {
-      if (ctx.chat.type === "private")
-        return ctx.reply("🚫 This command only works in group chats.");
-
-      if (!(await userCanManageContests(ctx))) {
-        return ctx.reply("🚫 Only group admins or whitelisted users can start contests.");
-      }
-
-      const parts = ctx.message.text.split(" ");
-      const game = parts[1];
-      const minutes = parseInt(parts[2] || "10");
-      await startContest(ctx, game, minutes);
-    } catch (err) {
-      console.error(err);
-      ctx.reply("⚠️ Unable to start contest. Please try again.");
-    }
+    const parts = ctx.message.text.split(" ");
+    const game = parts[1];
+    const minutes = parseInt(parts[2] || "10"); // default 10 minutes
+    await startContest(ctx, game, minutes);
   });
 
   bot.command("endcontest", async (ctx) => {
-    try {
-      if (ctx.chat.type === "private")
-        return ctx.reply("🚫 This command only works in group chats.");
-
-      if (!(await userCanManageContests(ctx))) {
-        return ctx.reply("🚫 Only group admins or whitelisted users can end contests.");
-      }
-
-      const parts = ctx.message.text.split(" ");
-      const game = parts[1];
-      if (!game) return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
-      await endContest(ctx, game);
-    } catch (err) {
-      console.error(err);
-      ctx.reply("⚠️ Unable to end contest. Please try again.");
-    }
+    const parts = ctx.message.text.split(" ");
+    const game = parts[1];
+    if (!game) return ctx.reply("Usage: /endcontest <flappycat|catsweeper>");
+    await endContest(ctx, game);
   });
 }
 
