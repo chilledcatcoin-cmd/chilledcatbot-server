@@ -52,6 +52,7 @@ const { setupContests } = require("./contests");
 const { setupGroupGuard } = require("./features/groupguard");
 const { setupLogging } = require("./features/logging");
 const { setupFortune } = require("./fortune");
+const { setupChillOrChaos } = require("./CoC");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
@@ -64,6 +65,7 @@ setupContests(bot);
 setupGroupGuard(bot);
 setupLogging(bot);
 setupFortune(bot);
+setupChillOrChaos(bot);
 
 module.exports = { bot };
 
