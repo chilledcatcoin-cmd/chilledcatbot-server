@@ -207,8 +207,25 @@ async function endContest(ctx, game) {
   }
 }
 
+
+function isWhitelisted(userId) {
+  const list = loadWhitelist();
+  const numeric = Number(userId);
+  const result = list.includes(numeric);
+
+  console.log("🔍 [Whitelist Debug]");
+  console.log("User ID:", userId, "Numeric:", numeric);
+  console.log("Loaded List:", list);
+  console.log("Matched:", result);
+  console.log("Whitelist file path:", filePath);
+
+  return result;
+}
+
+
+
 /* Wire contest commands into the bot */
-const { isWhitelisted } = require("./config/whitelist");
+const { isWhitelisted } = require("../config/whitelist");
 
 function setupContests(bot) {
   bot.command("startcontest", async (ctx) => {
