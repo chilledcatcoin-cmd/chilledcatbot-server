@@ -7,21 +7,6 @@ A Chilled Cat–flavored social deduction game for Telegram, inspired by Werewol
 - Bot assigns roles secretly (Chaos, Chill, Seer, Doctor, Meme Roles)
 - Game alternates between night/day until win condition
 
-## 📂 Folder Structure
-- index.js - entry point
-- game.js - game loop
-- roles_core.js - core roles
-- roles_meme.js - meme roles
-- utils.js - helpers
-
-## 🚀 Setup
-In your main bot.js:
-```js
-const { setupChillOrChaos } = require("./CoC");
-setupChillOrChaos(bot);
-```
-Restart bot, then play!
-
 ## 🐾 Commands
 - /join, /leave, /startgame, /status, /roles
 - /sabotage, /peek, /protect, /block (night actions)
