@@ -225,7 +225,7 @@ function isWhitelisted(userId) {
 
 
 /* Wire contest commands into the bot */
-const { isWhitelisted } = require("../config/whitelist");
+const { isWhitelisted } = require("./config/whitelist");
 
 function setupContests(bot) {
   bot.command("startcontest", async (ctx) => {
