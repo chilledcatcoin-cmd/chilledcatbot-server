@@ -59,6 +59,9 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
+const bot = new Telegraf(BOT_TOKEN); // ✅ Define bot BEFORE using it
+
+// 🪪 Sticker file_id grabber
 bot.on("sticker", async (ctx) => {
   try {
     if (!ctx.message?.sticker) return;
@@ -72,8 +75,6 @@ bot.on("sticker", async (ctx) => {
   }
 });
 
-const bot = new Telegraf(BOT_TOKEN);
-
 // Load features
 setupCommands(bot);
 setupContests(bot);
@@ -82,11 +83,9 @@ setupLogging(bot);
 setupFortune(bot);
 // setupChillOrChaos(bot);
 setupHowChill(bot);
-setupHowChill(bot);
 setupBattleRoyale(bot);
 
 module.exports = { bot };
-
 
 
 
