@@ -53,6 +53,14 @@
  * =====================================================
  */
 
+/**
+ * =====================================================
+ * ChilledCatBot - Bot Loader - bot.js
+ * =====================================================
+ * Initializes Telegraf + loads modules
+ * =====================================================
+ */
+
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
 const { setupContests } = require("./contests");
@@ -66,7 +74,6 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
-// ✅ Initialize bot
 const bot = new Telegraf(BOT_TOKEN);
 
 // ✅ Load Features
@@ -79,19 +86,22 @@ setupFortune(bot);
 setupHowChill(bot);
 setupBattleRoyale(bot);
 
-// ✅ Start bot safely (polling mode)
+// ✅ Safe Polling Launch (Fix for 409 conflict)
 (async () => {
   try {
-    // 🔧 Remove any old webhook before launching polling
-    await bot.telegram.deleteWebhook();
+    console.log("🌐 Clearing existing webhooks...");
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+
+    console.log("🚀 Launching bot in polling mode...");
     await bot.launch();
+
     console.log("😺 ChilledCatBot is online and ready to chill (polling mode).");
   } catch (err) {
     console.error("❌ Bot launch failed:", err);
   }
 })();
 
-// Enable clean exit handling for Render / Docker
+// ✅ Graceful Shutdown
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
