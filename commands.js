@@ -252,7 +252,6 @@ function setupCommands(bot) {
       return ctx.telegram.answerGameQuery(q.id, url.toString());
     }
   });
-}
 
  /* -------------------------------
      Battle Royale Commands
@@ -270,5 +269,9 @@ function setupCommands(bot) {
   });
 
   bot.command("join", (ctx) => joinBattle(ctx));
+
+}
+
+
 
 module.exports = { setupCommands };
