@@ -52,7 +52,7 @@ const { setupContests } = require("./contests");
 const { setupGroupGuard } = require("./features/groupguard");
 const { setupLogging } = require("./features/logging");
 const { setupFortune } = require("./fortune");
-const { setupChillOrChaos } = require("./CoC");
+// const { setupChillOrChaos } = require("./CoC");
 const { setupHowChill } = require("./features/howchill");
 const { setupBattleRoyale } = require("./BattleRoyale/battleRoyale");
 
@@ -67,7 +67,7 @@ setupContests(bot);
 setupGroupGuard(bot);
 setupLogging(bot);
 setupFortune(bot);
-setupChillOrChaos(bot);
+// setupChillOrChaos(bot);
 setupHowChill(bot);
 setupHowChill(bot);
 setupBattleRoyale(bot);
