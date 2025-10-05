@@ -49,6 +49,7 @@
 const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 const { contests, startContest, endContest } = require("./contests");
+const { startBattle, joinBattle } = require("./BattleRoyale/battleRoyale");
 
 /* -------------------------------
    Leaderboard Sender
@@ -252,5 +253,22 @@ function setupCommands(bot) {
     }
   });
 }
+
+ /* -------------------------------
+     Battle Royale Commands
+     ------------------------------- */
+  bot.command("battle", async (ctx) => {
+    const text = ctx.message.text.trim();
+    if (text.includes("start")) {
+      await startBattle(ctx);
+    } else {
+      await ctx.reply(
+        "Usage: `/battle start` to begin a Battle Royale, then `/join` to enter.",
+        { parse_mode: "Markdown" }
+      );
+    }
+  });
+
+  bot.command("join", (ctx) => joinBattle(ctx));
 
 module.exports = { setupCommands };

@@ -141,4 +141,21 @@ function logWinner(winner, total) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-module.exports = { startBattle, joinBattle };
+function setupBattleRoyale(bot) {
+  bot.command("battle", async (ctx) => {
+    const text = ctx.message.text.trim();
+    if (text.includes("start")) {
+      await startBattle(ctx);
+    } else {
+      await ctx.reply(
+        "Usage: `/battle start` to begin a Battle Royale, then `/join` to enter.",
+        { parse_mode: "Markdown" }
+      );
+    }
+  });
+
+  bot.command("join", (ctx) => joinBattle(ctx));
+  console.log("✅ Battle Royale commands registered");
+}
+
+module.exports = { setupBattleRoyale, startBattle, joinBattle };
