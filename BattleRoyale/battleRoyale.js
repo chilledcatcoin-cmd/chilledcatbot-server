@@ -1,7 +1,11 @@
-// BattleRoyale/battleRoyale.js
-const fs = require("fs");
+// top of battleRoyale.js
 const path = require("path");
-const { killEvents, reviveEvents, chillEvents, doubleKillEvents } = require("./events");
+const {
+  killEvents,
+  reviveEvents,
+  chillEvents,
+  doubleKillEvents,
+} = require(path.join(__dirname, "events"));
 
 let gameState = null;
 
