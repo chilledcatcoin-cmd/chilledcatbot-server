@@ -7,6 +7,7 @@
  * =====================================================
  */
 
+const emojis = require("./emojis");
 const {
   killEvents,
   reviveEvents,
@@ -49,9 +50,30 @@ let duel = {
 };
 
 /* -----------------------------------------------------
+ * 😺 Chilled Cat Emoji Helper
+ * ----------------------------------------------------- */
+async function sendCatEmoji(ctx, emojiId, text) {
+  try {
+    await ctx.telegram.sendMessage(ctx.chat.id, text, {
+      entities: [
+        {
+          type: "custom_emoji",
+          offset: 0,
+          length: 2,
+          custom_emoji_id: emojiId,
+        },
+      ],
+      parse_mode: "Markdown",
+    });
+  } catch (err) {
+    console.error("Emoji send failed:", err);
+    ctx.reply(text); // fallback
+  }
+}
+
+/* -----------------------------------------------------
  * Helper Functions
  * ----------------------------------------------------- */
-
 function announce(ctx, msg) {
   ctx.telegram.sendMessage(ctx.chat.id, msg, { parse_mode: "Markdown" });
 }
@@ -87,8 +109,9 @@ async function startBattle(ctx) {
     rounds: 0,
   };
 
-  announce(
+  sendCatEmoji(
     ctx,
+    emojis.CAT_WAVE,
     `🐾 *${ctx.from.first_name}* has started the **Chilled Cat Battle Royale!**\nType /brjoin to enter — gates close in 60 seconds!`
   );
 
@@ -110,7 +133,7 @@ async function startBattle(ctx) {
   };
 
   gameState.resetJoinTimer = () => {
-    announce(ctx, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
+    sendCatEmoji(ctx, emojis.CAT_IDEA, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
     gameState.timers.forEach(clearTimeout);
     gameState.startTime = Date.now();
     gameState.timers = [
@@ -149,8 +172,9 @@ function joinBattle(ctx) {
     remainingSec = CONFIG.RESET_JOIN_TIME / 1000;
   }
 
-  announce(
+  sendCatEmoji(
     ctx,
+    emojis.CAT_THUMBS_UP,
     `😺 ${name} has joined the battle!\nType /brjoin to enter — gates close in *${remainingSec} seconds!*`
   );
 }
@@ -164,7 +188,7 @@ function leaveBattle(ctx) {
 
   gameState.alive = gameState.alive.filter((p) => p !== name);
   gameState.dead.push(name);
-  announce(ctx, `💀 ${name} has left the arena.`);
+  sendCatEmoji(ctx, emojis.CAT_NERVOUS, `💀 ${name} has left the arena.`);
 }
 
 async function cancelBattle(ctx) {
@@ -175,7 +199,7 @@ async function cancelBattle(ctx) {
   if (!gameState.active) return ctx.reply("No battle to cancel.");
   gameState.active = false;
   gameState.timers.forEach(clearTimeout);
-  announce(ctx, "❌ The Chilled Cat Battle Royale has been cancelled.");
+  sendCatEmoji(ctx, emojis.CAT_BLAH, "❌ The Chilled Cat Battle Royale has been cancelled.");
 }
 
 /* -----------------------------------------------------
@@ -192,8 +216,9 @@ async function forceEndBattle(ctx) {
     return announce(ctx, "😿 All cats are gone... No winner today!");
 
   const winner = pick(gameState.alive);
-  announce(
+  sendCatEmoji(
     ctx,
+    emojis.CAT_COOL,
     `💥 *${ctx.from.first_name}* has force-ended the Battle Royale!\n\n🏆 *${winner}* is declared the **Chillest Cat Alive™!** 😼`
   );
 
@@ -211,12 +236,12 @@ function startRounds(ctx) {
   gameState.rounds = 0;
 
   if (gameState.alive.length < 2) {
-    announce(ctx, "😿 Not enough cats joined. Battle cancelled.");
+    sendCatEmoji(ctx, emojis.CAT_ASS, "😿 Not enough cats joined. Battle cancelled.");
     gameState.active = false;
     return;
   }
 
-  announce(ctx, "⏰ Time’s up! The arena fills with fog... Let the chaos begin!");
+  sendCatEmoji(ctx, emojis.CAT_WAVE, "⏰ Time’s up! The arena fills with fog... Let the chaos begin!");
 
   const interval = setInterval(() => {
     if (!gameState.active) return clearInterval(interval);
@@ -237,8 +262,9 @@ function doRound(ctx) {
   gameState.rounds++;
 
   if (gameState.rounds % CONFIG.STATUS_EVERY_N_ROUNDS === 0) {
-    announce(
+    sendCatEmoji(
       ctx,
+      emojis.CAT_IDEA,
       `📢 *Round ${gameState.rounds} Update!*\n😼 Alive: *${gameState.alive.length}* | 💀 Dead: *${gameState.dead.length}*\n🌪️ The battle rages on...`
     );
   }
@@ -257,8 +283,9 @@ function triggerDuel(ctx) {
   const [A, B] = pickPair();
   duel = { active: true, playerA: A, playerB: B, rolls: {} };
 
-  announce(
+  sendCatEmoji(
     ctx,
+    emojis.CAT_FLEX,
     `⚔️ A duel begins between ${A} and ${B}!\nThey have *${CONFIG.DUEL_TIMEOUT / 1000} seconds* to /roll — highest roll survives!`
   );
 
@@ -292,55 +319,31 @@ function resolveDuel(ctx) {
   const rollA = rolls[playerA];
   const rollB = rolls[playerB];
 
-  if (!rollA && !rollB) announce(ctx, `💀 Neither ${playerA} nor ${playerB} rolled! Both perish.`), eliminate(ctx, [playerA, playerB]);
-  else if (!rollA) announce(ctx, `💀 ${playerA} failed to roll and is eliminated!`), eliminate(ctx, [playerA]);
-  else if (!rollB) announce(ctx, `💀 ${playerB} failed to roll and is eliminated!`), eliminate(ctx, [playerB]);
-  else if (rollA > rollB) announce(ctx, `😼 ${playerA} wins! ${playerB} is eliminated!`), eliminate(ctx, [playerB]);
-  else if (rollB > rollA) announce(ctx, `😼 ${playerB} wins! ${playerA} is eliminated!`), eliminate(ctx, [playerA]);
-  else announce(ctx, `💥 It's a tie! Both are eliminated!`), eliminate(ctx, [playerA, playerB]);
+  if (!rollA && !rollB)
+    sendCatEmoji(ctx, emojis.CAT_ASS, `💀 Neither ${playerA} nor ${playerB} rolled! Both perish.`),
+      eliminate(ctx, [playerA, playerB]);
+  else if (!rollA)
+    sendCatEmoji(ctx, emojis.CAT_BLAH, `💀 ${playerA} failed to roll and is eliminated!`),
+      eliminate(ctx, [playerA]);
+  else if (!rollB)
+    sendCatEmoji(ctx, emojis.CAT_BLAH, `💀 ${playerB} failed to roll and is eliminated!`),
+      eliminate(ctx, [playerB]);
+  else if (rollA > rollB)
+    sendCatEmoji(ctx, emojis.CAT_FLEX, `😼 ${playerA} wins! ${playerB} is eliminated!`),
+      eliminate(ctx, [playerB]);
+  else if (rollB > rollA)
+    sendCatEmoji(ctx, emojis.CAT_FLEX, `😼 ${playerB} wins! ${playerA} is eliminated!`),
+      eliminate(ctx, [playerA]);
+  else sendCatEmoji(ctx, emojis.CAT_ASS, `💥 It's a tie! Both perish!`), eliminate(ctx, [playerA, playerB]);
 }
 
 /* -----------------------------------------------------
- *  Events & End Game
+ *  End Game
  * ----------------------------------------------------- */
-
-function eliminate(ctx, players) {
-  for (const p of players) {
-    gameState.alive = gameState.alive.filter((x) => x !== p);
-    gameState.dead.push(p);
-  }
-}
-
-function killEvent(ctx) {
-  if (gameState.alive.length < 2) return;
-  const [A, B] = pickPair();
-  announce(ctx, `🔥 ${pick(killEvents).replace("{A}", A).replace("{B}", B)}`);
-  eliminate(ctx, [B]);
-}
-
-function doubleKillEvent(ctx) {
-  if (gameState.alive.length < 3) return killEvent(ctx);
-  const [A, B] = pickPair();
-  announce(ctx, `💥 ${pick(doubleKillEvents).replace("{A}", A).replace("{B}", B)}`);
-  eliminate(ctx, [A, B]);
-}
-
-function chillEvent(ctx) {
-  announce(ctx, pick(chillEvents));
-}
-
-function reviveEvent(ctx) {
-  if (!gameState.dead.length) return chillEvent(ctx);
-  const revived = pick(gameState.dead);
-  gameState.dead = gameState.dead.filter((p) => p !== revived);
-  gameState.alive.push(revived);
-  announce(ctx, pick(reviveEvents).replace("{B}", revived));
-}
-
 function endBattle(ctx) {
   gameState.active = false;
   if (Math.random() < CONFIG.DRAW_CHANCE)
-    return announce(ctx, "😺 The battle ends in a *draw!* All cats nap peacefully. 💤");
+    return sendCatEmoji(ctx, emojis.CAT_NAP, "😺 The battle ends in a *draw!* All cats nap peacefully. 💤");
 
   const winner = gameState.alive[0];
   const frames = ["😺 Spinning the Chill Wheel... ⏳", "🌪️", "💫", "😸"];
@@ -349,7 +352,7 @@ function endBattle(ctx) {
     announce(ctx, frames[i]);
     if (++i >= frames.length) {
       clearInterval(spin);
-      announce(ctx, `🏆 *${winner}* is crowned the **Chillest Cat Alive™!** 😼`);
+      sendCatEmoji(ctx, emojis.CAT_COOL, `🏆 *${winner}* is crowned the **Chillest Cat Alive™!** 😼`);
       announce(ctx, "🎉 The Battle Royale has ended. Thanks for playing!");
     }
   }, 800);
@@ -358,7 +361,6 @@ function endBattle(ctx) {
 /* -----------------------------------------------------
  *  Commands
  * ----------------------------------------------------- */
-
 function setupBattleRoyale(bot) {
   bot.command("brstart", startBattle);
   bot.command("brcancel", cancelBattle);
@@ -366,38 +368,8 @@ function setupBattleRoyale(bot) {
   bot.command("brjoin", joinBattle);
   bot.command("brleave", leaveBattle);
   bot.command("roll", handleRoll);
-
-  bot.command("brstatus", (ctx) => {
-    if (!gameState.active) return ctx.reply("😿 No active Battle Royale right now.");
-    sendStatus(ctx);
-  });
-
-  bot.command("br", (ctx) => {
-    let msg =
-      "😺 *Chilled Cat Battle Royale Commands*\n\n" +
-      "🏁 `/brstart` — Start a new battle (admin only)\n" +
-      "❌ `/brcancel` — Cancel a battle (admin only)\n" +
-      "💥 `/brforceend` — Force-end and declare winner (admin only)\n" +
-      "🐾 `/brjoin` — Join the active battle\n" +
-      "🚪 `/brleave` — Leave or forfeit\n" +
-      "🎲 `/roll` — Roll during a duel\n" +
-      "📊 `/brstatus` — Check game status\n\n";
-
-    if (gameState.active) {
-      if (gameState.joinOpen) {
-        const elapsed = Date.now() - gameState.startTime;
-        const remainingSec = Math.max(
-          0,
-          Math.floor((CONFIG.JOIN_DURATION - elapsed) / 1000)
-        );
-        msg += `🚪 *Lobby Open!*\nType /brjoin to enter — gates close in *${remainingSec} seconds!*`;
-      } else {
-        msg += `🔥 *Current Battle*\n😼 Alive: *${gameState.alive.length}* | 💀 Dead: *${gameState.dead.length}*\n`;
-      }
-    } else msg += "✨ No battle currently running. Start one with `/brstart`!";
-
-    ctx.reply(msg, { parse_mode: "Markdown" });
-  });
+  bot.command("brstatus", (ctx) => sendStatus(ctx));
+  bot.command("br", (ctx) => sendHelp(ctx));
 
   console.log("✅ Battle Royale quick commands registered.");
 }
@@ -406,10 +378,24 @@ function sendStatus(ctx) {
   let msg = `📊 *Battle Royale Status*\n\n😼 Alive: *${gameState.alive.length}* | 💀 Dead: *${gameState.dead.length}*\n\n`;
   if (gameState.alive.length) msg += `🐾 Alive:\n${gameState.alive.join(", ")}\n\n`;
   if (gameState.dead.length) msg += `🪦 Fallen:\n${gameState.dead.join(", ")}\n\n`;
-  if (duel.active)
-    msg += `⚔️ Duel in progress: ${duel.playerA} vs ${duel.playerB}`;
+  if (duel.active) msg += `⚔️ Duel in progress: ${duel.playerA} vs ${duel.playerB}`;
   else msg += "😺 No duel active right now.";
   ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
+function sendHelp(ctx) {
+  ctx.reply(
+    "😺 *Chilled Cat Battle Royale Commands*\n\n" +
+      "🏁 `/brstart` — Start a new battle (admin)\n" +
+      "❌ `/brcancel` — Cancel a battle (admin)\n" +
+      "💥 `/brforceend` — Force-end and declare winner (admin)\n" +
+      "🐾 `/brjoin` — Join the active battle\n" +
+      "🚪 `/brleave` — Leave or forfeit\n" +
+      "🎲 `/roll` — Roll during a duel\n" +
+      "📊 `/brstatus` — Check game status\n\n" +
+      "✨ Type `/brstart` to begin!",
+    { parse_mode: "Markdown" }
+  );
 }
 
 /* -----------------------------------------------------
