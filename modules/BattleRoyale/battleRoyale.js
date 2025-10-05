@@ -3,7 +3,7 @@
  *  Chilled Cat Battle Royale - Core Logic Module
  * =====================================================
  *  Handles: game state, events, timing, winners,
- *  logging, and Telegram command integration.
+ *  duels, logging, and Telegram command integration.
  * =====================================================
  */
 
@@ -111,44 +111,45 @@ async function startBattle(ctx) {
     `🐾 *${ctx.from.first_name}* has opened the **Chilled Cat Battle Royale!**\nType /joinbr to enter — gates close in 60 seconds!`
   );
 
-const startJoinTimers = () => {
-  gameState.timers.forEach((t) => clearTimeout(t));
-  gameState.timers = [
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen)
-        announce(ctx, "⏳ 30 seconds left to join! Type /joinbr to enter!");
-    }, CONFIG.JOIN_DURATION - 30000),
+  const startJoinTimers = () => {
+    gameState.timers.forEach((t) => clearTimeout(t));
+    gameState.timers = [
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 30 seconds left to join! Type /joinbr to enter!");
+      }, CONFIG.JOIN_DURATION - 30000),
 
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen)
-        announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
-    }, CONFIG.JOIN_DURATION - 10000),
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
+      }, CONFIG.JOIN_DURATION - 10000),
 
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen) startRounds(ctx);
-    }, CONFIG.JOIN_DURATION),
-  ];
-};
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen) startRounds(ctx);
+      }, CONFIG.JOIN_DURATION),
+    ];
+  };
 
-// Allow timer reset (used when a new challenger joins last-second)
-gameState.resetJoinTimer = () => {
-  announce(ctx, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
-  gameState.timers.forEach((t) => clearTimeout(t));
-  gameState.timers = [
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen)
-        announce(ctx, "⏳ 15 seconds left to join! Type /joinbr to enter!");
-    }, CONFIG.RESET_JOIN_TIME - 15000),
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen)
-        announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
-    }, CONFIG.RESET_JOIN_TIME - 10000),
-    setTimeout(() => {
-      if (gameState.active && gameState.joinOpen) startRounds(ctx);
-    }, CONFIG.RESET_JOIN_TIME),
-  ];
-};
+  // Allow timer reset
+  gameState.resetJoinTimer = () => {
+    announce(ctx, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
+    gameState.timers.forEach((t) => clearTimeout(t));
+    gameState.timers = [
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 15 seconds left to join! Type /joinbr to enter!");
+      }, CONFIG.RESET_JOIN_TIME - 15000),
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
+      }, CONFIG.RESET_JOIN_TIME - 10000),
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen) startRounds(ctx);
+      }, CONFIG.RESET_JOIN_TIME),
+    ];
+  };
 
+  startJoinTimers();
 }
 
 function joinBattle(ctx) {
@@ -161,18 +162,15 @@ function joinBattle(ctx) {
 
   gameState.alive.push(name);
 
-  // Calculate remaining join time
   const elapsed = Date.now() - gameState.startTime;
   let remainingSec = Math.max(0, Math.floor((CONFIG.JOIN_DURATION - elapsed) / 1000));
 
-  // If joined too late, reset timer and override remainingSec
   if (remainingSec <= CONFIG.RESET_JOIN_THRESHOLD / 1000) {
     gameState.startTime = Date.now();
     gameState.resetJoinTimer();
-    remainingSec = CONFIG.RESET_JOIN_TIME / 1000; // 👈 Force display to 30 seconds
+    remainingSec = CONFIG.RESET_JOIN_TIME / 1000;
   }
 
-  // Announce join and remaining time
   announce(
     ctx,
     `😺 ${name} has joined the battle!\nType /joinbr to enter — gates close in *${remainingSec} seconds!*`
@@ -237,7 +235,6 @@ function startRounds(ctx) {
 function doRound(ctx) {
   gameState.rounds++;
 
-  // Auto status reminder
   if (gameState.rounds % CONFIG.STATUS_EVERY_N_ROUNDS === 0) {
     let msg = `📢 *Round ${gameState.rounds} Update!*\n\n`;
     msg += `😼 Alive: *${gameState.alive.length}*\n💀 Dead: *${gameState.dead.length}*\n\n`;
@@ -247,7 +244,6 @@ function doRound(ctx) {
     announce(ctx, msg);
   }
 
-  // 10% chance of duel
   if (Math.random() < 0.1 && gameState.alive.length >= 2) {
     triggerDuel(ctx);
     return;
@@ -432,6 +428,27 @@ function endBattle(ctx) {
 }
 
 /* -----------------------------------------------------
+ *  History Command
+ * ----------------------------------------------------- */
+function showHistory(ctx) {
+  const data = readHistory();
+  if (!data.length) return ctx.reply("📜 No battle history yet, meow~");
+
+  const recent = data.slice(-5).reverse();
+  let msg = "📜 *Recent Battle Royale Results:*\n\n";
+  for (const r of recent) {
+    const date = new Date(r.date).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    msg += `🏁 ${date} — *${r.winner}* (${r.participants} cats)\n`;
+  }
+  ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
+/* -----------------------------------------------------
  *  Commands
  * ----------------------------------------------------- */
 
@@ -449,8 +466,8 @@ function setupBattleRoyale(bot) {
         "😼 `/joinbr` — Join an active battle\n" +
         "💀 `/brforfeit` — Forfeit mid-battle\n" +
         "📜 `/battleroyale history` — View recent results\n" +
-        "🎲 `/roll` — Roll during a duel\n" +
         "📊 `/battlestatus` — Check battle status\n" +
+        "🎲 `/roll` — Roll during a duel\n" +
         "❌ `/battleroyale cancel` — Cancel a match (admin only)",
       { parse_mode: "Markdown" }
     );
@@ -459,38 +476,7 @@ function setupBattleRoyale(bot) {
   bot.command("joinbr", (ctx) => joinBattle(ctx));
   bot.command("brforfeit", (ctx) => forfeitBattle(ctx));
   bot.command("roll", (ctx) => handleRoll(ctx));
-
-  /* -------------------------------
-     📊 Battle Status Command
-     ------------------------------- */
-  bot.command("battlestatus", (ctx) => {
-    if (!gameState.active)
-      return ctx.reply("😿 No active Battle Royale right now.");
-
-    const aliveCount = gameState.alive.length;
-    const deadCount = gameState.dead.length;
-
-    let msg = `📊 *Battle Royale Status*\n\n`;
-    msg += `😼 Alive: *${aliveCount}*\n💀 Dead: *${deadCount}*\n\n`;
-
-    if (aliveCount > 0)
-      msg += `🐾 Alive Cats:\n${gameState.alive.join(", ")}\n\n`;
-    if (deadCount > 0)
-      msg += `🪦 Fallen Cats:\n${gameState.dead.join(", ")}\n\n`;
-
-    if (duel.active) {
-      msg += `⚔️ *Duel in progress!*\n${duel.playerA} vs ${duel.playerB}\n`;
-      if (Object.keys(duel.rolls).length > 0) {
-        msg += `🎲 Rolls so far: ${Object.entries(duel.rolls)
-          .map(([p, v]) => `${p}: ${v}`)
-          .join(", ")}\n`;
-      }
-    } else {
-      msg += "😺 No duel active right now.";
-    }
-
-    ctx.reply(msg, { parse_mode: "Markdown" });
-  });
+  bot.command("battleroyale_history", (ctx) => showHistory(ctx));
 
   console.log("✅ Battle Royale commands registered.");
 }
@@ -504,4 +490,5 @@ module.exports = {
   joinBattle,
   forfeitBattle,
   cancelBattle,
+  showHistory,
 };
