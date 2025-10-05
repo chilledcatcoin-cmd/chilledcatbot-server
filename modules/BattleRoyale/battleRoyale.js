@@ -7,7 +7,7 @@
  * =====================================================
  */
 
-const emojis = require("./emojis");
+const emojis = require("./BattleRoyale/emojis");
 const {
   killEvents,
   reviveEvents,
