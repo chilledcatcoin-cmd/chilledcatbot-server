@@ -1,55 +1,22 @@
 /**
- *
- *    _______   .---.  .---..-./`)   .---.     .---.       .-''-.   ______     
- *   /   __  \  |   |  |_ _|\ .-.')  | ,_|     | ,_|     .'_ _   \ |    _ `''. 
- *  | ,_/  \__) |   |  ( ' )/ `-' \,-./  )   ,-./  )    / ( ` )   '| _ | ) _  \
- *,-./  )       |   '-(_{;}_)`-'`"`\  '_ '`) \  '_ '`) . (_ o _)  ||( ''_'  ) |
- *\  '_ '`)     |      (_,_) .---.  > (_)  )  > (_)  ) |  (_,_)___|| . (_) `. |
- * > (_)  )  __ | _ _--.   | |   | (  .  .-' (  .  .-' '  \   .---.|(_    ._) '
- *(  .  .-'_/  )|( ' ) |   | |   |  `-'`-'|___`-'`-'|___\  `-'    /|  (_.\.' / 
- * `-'`-'     / (_{;}_)|   | |   |   |        \|        \\       / |       .'  
- *   `._____.'  '(_,_) '---' '---'   `--------``--------` `'-..-'  '-----'`    
- *                                                                           
- *                   +=*          ***	    _______      ____   ,---------. 			              
- *                  *:::*        *=.:*	   /   __  \   .'  __ `.\          \	             
- *                 *.::::+      *:.:::*     | ,_/  \__) /   '  \  \`--.  ,---'         
- *                 +....+*++**++::::::=*  ,-./  )       |___|  /  |   |   \       
- *               *+++=:.:::::.:..:.::::*  \  '_ '`)        _.-`   |   :_ _:            
- *                ++++=--=+=-+:=+++++++=+  > (_)  )  __ .'   _    |   (_I_)        
- *               *:+..##.:++::+++***=++*  (  .  .-'_/  )|  _( )_  |  (_(=)_)   
- *               *..*....-+:::++..#:..=+   `-'`-'     / \ (_ o _) /   (_I_)   
- *               *........+::.+.:++*+..*     `._____.'   '.(_,_).'    '---'
- *               *...*+:.:::::-....:...+           
- *               *....*....:=.....::...**:**=*     
- *               *.....+=...+...-:....-*::+=:+*-*  
- *                +....+**+**+****.:=+*+.=*:=*.:*  
- *              **+....=-:####%:+...*.+::::.*=:*   
- *           *:..=*++=..:+=:::=*....*...*::..:*    
- *         *+.:+......:+.......:+*-:=+.......*     
- *         *.=-........:=............:+:...:**     [ chilled cat warez ]       /\_/\         
- *        *:-=...=...*.++.............*::::*.*     nfo: vibes • meow • zzz    ( o.o )        
- *        *.*....*::.**:.............*-.:::+.*     rel: 1997 // TON forever    > ^ <         
- *        *:=....=**+:...........::..*.....+:*     
- *        **.....+*::=+::.::.....:*:**..:..+:*     
- *        **.....+:-+*:.:+::::**:-=::+.....+:*     
- *
  * =====================================================
- * ChilledCatBot - Commands - commands.js - Registers /start, /menu, /leaderboard
- * Version: 1.4.0
- * Date: 2025-10-01
- *
- * Changelog:
- * v1.4.0 - Extracted commands into own file
- * v1.3.0 - Added inline keyboards to /menu
- * v1.2.0 - Leaderboard supports global + group
- * v1.0.0 - Basic /start + /flappycat + /catsweeper
+ * ChilledCatBot - Commands - commands.js
+ * Registers all commands for games, contests, and features
  * =====================================================
  */
 
 const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 const { contests, startContest, endContest } = require("./contests");
-const { startBattle, joinBattle } = require("./BattleRoyale/battleRoyale");
+
+// 🧩 Battle Royale Module
+const {
+  startBattle,
+  joinBattle,
+  forfeitBattle,
+  cancelBattle,
+  showHistory,
+} = require("./modules/BattleRoyale/battleRoyale");
 
 /* -------------------------------
    Leaderboard Sender
@@ -90,7 +57,6 @@ async function sendLeaderboard(ctx, game, scope = "global") {
       msg += `${i + 1}. ${name} — ${e.StatValue}\n`;
     });
 
-    // show time left in contest
     if (scope === "contest" && timeRemaining > 0) {
       const mins = Math.floor(timeRemaining / 60000);
       const secs = Math.floor((timeRemaining % 60000) / 1000);
@@ -108,19 +74,28 @@ async function sendLeaderboard(ctx, game, scope = "global") {
    Commands Setup
    ------------------------------- */
 function setupCommands(bot) {
+  /* -------------------------------
+     Start / Help Menu
+     ------------------------------- */
   bot.start((ctx) => {
-    ctx.reply("😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
-      "🎮 /flappycat — Play Flappy Cat\n" +
-      "💣 /catsweeper — Play CatSweeper\n" +
-      "🏆 /leaderboard <game> [global|group|contest]\n" +
-      "🎯 /startcontest <game> <minutes>\n" +
-      "🏁 /endcontest <game>\n" +
-      "📊 /flappycontest — View Flappy Cat contest\n" +
-      "📊 /sweepercontest — View CatSweeper contest\n" +
-      "🧹 /clear — Clear the chat (DM only)",
-      { parse_mode: "Markdown" });
+    ctx.reply(
+      "😺 Welcome to *Chilled Cat Games!*\n\nCommands:\n" +
+        "🎮 /flappycat — Play Flappy Cat\n" +
+        "💣 /catsweeper — Play CatSweeper\n" +
+        "😼 /battleroyale — Start a Chilled Cat Battle Royale\n" +
+        "🏆 /leaderboard <game> [global|group|contest]\n" +
+        "🎯 /startcontest <game> <minutes>\n" +
+        "🏁 /endcontest <game>\n" +
+        "📊 /flappycontest — View Flappy Cat contest\n" +
+        "📊 /sweepercontest — View CatSweeper contest\n" +
+        "🧹 /clear — Clear the chat (DM only)",
+      { parse_mode: "Markdown" }
+    );
   });
 
+  /* -------------------------------
+     Games
+     ------------------------------- */
   bot.command("flappycat", (ctx) => ctx.replyWithGame("flappycat"));
   bot.command("catsweeper", (ctx) => ctx.replyWithGame("catsweeper"));
 
@@ -141,7 +116,10 @@ function setupCommands(bot) {
       await ctx.reply("⚠️ Could not clear messages.");
     }
   });
-  // General leaderboard
+
+  /* -------------------------------
+     Leaderboard
+     ------------------------------- */
   bot.command("leaderboard", async (ctx) => {
     const parts = ctx.message.text.split(" ");
     const game = parts[1];
@@ -149,44 +127,11 @@ function setupCommands(bot) {
     await sendLeaderboard(ctx, game, scope);
   });
 
-  // Short leaderboard commands
   bot.command("flappyglobal", (ctx) => sendLeaderboard(ctx, "flappycat", "global"));
   bot.command("flappygroup", (ctx) => sendLeaderboard(ctx, "flappycat", "group"));
 
-  bot.command("flappycontest", async (ctx) => {
-    // show contest for this group
-    await sendLeaderboard(ctx, "flappycat", "contest");
-
-    // also list other active contests
-    let msg = "\n📢 Active contests in other groups:\n";
-    let found = false;
-    contests.forEach((c, chatId) => {
-      if (c.game === "flappycat" && chatId !== ctx.chat.id && Date.now() < c.expires) {
-        const mins = Math.ceil((c.expires - Date.now()) / 60000);
-        msg += `- ${c.groupTitle || "Group"} (${mins}m left)\n`;
-        found = true;
-      }
-    });
-    if (found) ctx.reply(msg);
-  });
-
   bot.command("sweeperglobal", (ctx) => sendLeaderboard(ctx, "catsweeper", "global"));
   bot.command("sweepergroup", (ctx) => sendLeaderboard(ctx, "catsweeper", "group"));
-
-  bot.command("sweepercontest", async (ctx) => {
-    await sendLeaderboard(ctx, "catsweeper", "contest");
-
-    let msg = "\n📢 Active contests in other groups:\n";
-    let found = false;
-    contests.forEach((c, chatId) => {
-      if (c.game === "catsweeper" && chatId !== ctx.chat.id && Date.now() < c.expires) {
-        const mins = Math.ceil((c.expires - Date.now()) / 60000);
-        msg += `- ${c.groupTitle || "Group"} (${mins}m left)\n`;
-        found = true;
-      }
-    });
-    if (found) ctx.reply(msg);
-  });
 
   /* -------------------------------
      Contest Commands
@@ -200,7 +145,6 @@ function setupCommands(bot) {
     const game = parts[1];
     const minutes = parseInt(parts[2] || "30"); // default 30m
 
-    // Admin check
     try {
       const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
       if (member.status !== "administrator" && member.status !== "creator") {
@@ -211,7 +155,6 @@ function setupCommands(bot) {
       return ctx.reply("⚠️ Could not verify admin rights.");
     }
 
-    // pass group title to contests.js
     startContest(ctx, game, minutes, ctx.chat.title);
   });
 
@@ -224,6 +167,33 @@ function setupCommands(bot) {
     const game = parts[1];
     endContest(ctx, game);
   });
+
+  /* -------------------------------
+     Battle Royale Commands
+     ------------------------------- */
+  bot.command("battleroyale", async (ctx) => {
+    const text = ctx.message.text.trim().toLowerCase();
+
+    if (text.includes("start")) return startBattle(ctx);
+    if (text.includes("cancel")) return cancelBattle(ctx);
+    if (text.includes("history")) return showHistory(ctx);
+
+    return ctx.reply(
+      "😺 *Chilled Cat Battle Royale*\n\n" +
+        "Commands:\n" +
+        "🐾 `/battleroyale start` — Start a new match (admin only)\n" +
+        "😼 `/joinbr` — Join the current battle\n" +
+        "💀 `/brforfeit` — Forfeit mid-battle\n" +
+        "📜 `/battleroyale history` — View recent results\n" +
+        "❌ `/battleroyale cancel` — Cancel a match (admin only)",
+      { parse_mode: "Markdown" }
+    );
+  });
+
+  bot.command("joinbr", (ctx) => joinBattle(ctx));
+  bot.command("brforfeit", (ctx) => forfeitBattle(ctx));
+
+  console.log("✅ Battle Royale commands registered.");
 
   /* -------------------------------
      Game Launch via Callback
@@ -252,26 +222,6 @@ function setupCommands(bot) {
       return ctx.telegram.answerGameQuery(q.id, url.toString());
     }
   });
-
- /* -------------------------------
-     Battle Royale Commands
-     ------------------------------- */
-  bot.command("battle", async (ctx) => {
-    const text = ctx.message.text.trim();
-    if (text.includes("start")) {
-      await startBattle(ctx);
-    } else {
-      await ctx.reply(
-        "Usage: `/battle start` to begin a Battle Royale, then `/join` to enter.",
-        { parse_mode: "Markdown" }
-      );
-    }
-  });
-
-  bot.command("join", (ctx) => joinBattle(ctx));
-
 }
-
-
 
 module.exports = { setupCommands };
