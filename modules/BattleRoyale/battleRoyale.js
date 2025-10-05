@@ -54,7 +54,8 @@ let duel = {
  * ----------------------------------------------------- */
 async function sendCatEmoji(ctx, emojiId, text) {
   try {
-    await ctx.telegram.sendMessage(ctx.chat.id, `🌀 ${text}`, {
+    const messageText = "🌀 " + text; // 🌀 placeholder, will be replaced
+    await ctx.telegram.sendMessage(ctx.chat.id, messageText, {
       entities: [
         {
           type: "custom_emoji",
@@ -63,13 +64,13 @@ async function sendCatEmoji(ctx, emojiId, text) {
           custom_emoji_id: emojiId,
         },
       ],
-      parse_mode: "Markdown",
     });
   } catch (err) {
     console.error("Emoji send failed:", err);
     await ctx.reply(text);
   }
 }
+
 
 /* -----------------------------------------------------
  * Helper Functions
@@ -378,7 +379,9 @@ function eliminate(ctx, players) {
 function killEvent(ctx) {
   if (gameState.alive.length < 2) return;
   const [A, B] = pickPair();
-  const msg = pick(killEvents).replace("{A}", A).replace("{B}", B);
+const msg = pick(killEvents)
+  .replaceAll("{A}", A)
+  .replaceAll("{B}", B);
   eliminate(ctx, [B]);
   sendCatEmoji(ctx, emojis.CAT_ASS, `🔥 ${msg}`);
 }
@@ -386,7 +389,10 @@ function killEvent(ctx) {
 function doubleKillEvent(ctx) {
   if (gameState.alive.length < 3) return killEvent(ctx);
   const [A, B] = pickPair();
-  const msg = pick(doubleKillEvents).replace("{A}", A).replace("{B}", B);
+const msg = pick(doubleKillEvents)
+  .replaceAll("{A}", A)
+  .replaceAll("{B}", B);
+
   eliminate(ctx, [A, B]);
   sendCatEmoji(ctx, emojis.CAT_SLAP_PEACH, `💥 ${msg}`);
 }
