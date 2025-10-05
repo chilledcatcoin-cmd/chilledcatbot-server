@@ -61,19 +61,27 @@ if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
 const bot = new Telegraf(BOT_TOKEN); // ✅ Define bot BEFORE using it
 
-// 🪪 Sticker file_id grabber
-bot.on("sticker", async (ctx) => {
+// Log custom emoji IDs
+bot.on("message", async (ctx) => {
   try {
-    if (!ctx.message?.sticker) return;
-    const sticker = ctx.message.sticker;
-    console.log("Sticker ID:", sticker.file_id);
-    await ctx.reply(`🪪 Sticker file_id:\n<code>${sticker.file_id}</code>`, {
-      parse_mode: "HTML",
-    });
+    const entities = ctx.message?.entities || ctx.message?.caption_entities;
+    if (!entities) return;
+
+    for (const e of entities) {
+      if (e.type === "custom_emoji") {
+        const emojiText = ctx.message.text?.substring(e.offset, e.offset + e.length);
+        console.log("Custom emoji ID:", e.custom_emoji_id);
+        await ctx.reply(
+          `😸 Custom emoji detected: ${emojiText}\n<code>${e.custom_emoji_id}</code>`,
+          { parse_mode: "HTML" }
+        );
+      }
+    }
   } catch (err) {
-    console.error("Sticker handler error:", err);
+    console.error("Emoji handler error:", err);
   }
 });
+
 
 // Load features
 setupCommands(bot);
