@@ -2,13 +2,11 @@
  * =====================================================
  *  Chilled Cat Battle Royale - Core Logic Module
  * =====================================================
- *  Handles: game state, events, timing, winners,
- *  duels, logging, and Telegram command integration.
+ *  Handles: game state, events, timing, duels,
+ *  and Telegram command integration.
  * =====================================================
  */
 
-const fs = require("fs");
-const path = require("path");
 const {
   killEvents,
   reviveEvents,
@@ -29,9 +27,9 @@ const CONFIG = {
   STATUS_EVERY_N_ROUNDS: 3,   // Post battle status every 3 rounds automatically
 };
 
-const HISTORY_FILE = path.join(__dirname, "battle_history.json");
-
-// Game state in memory
+// ================================
+// 🧠 GAME STATE
+// ================================
 let gameState = {
   active: false,
   joinOpen: false,
@@ -42,7 +40,6 @@ let gameState = {
   rounds: 0,
 };
 
-// Duel state
 let duel = {
   active: false,
   playerA: null,
@@ -52,7 +49,7 @@ let duel = {
 };
 
 /* -----------------------------------------------------
- * Helper Functions
+ *  Helper Functions
  * ----------------------------------------------------- */
 
 function announce(ctx, msg) {
@@ -65,23 +62,8 @@ function pick(arr) {
 
 function pickPair() {
   const a = pick(gameState.alive);
-  let b = pick(gameState.alive.filter((x) => x !== a));
+  const b = pick(gameState.alive.filter((x) => x !== a));
   return [a, b];
-}
-
-function readHistory() {
-  try {
-    return JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-function logWinner(winner, total) {
-  const data = readHistory();
-  data.push({ winner, participants: total, date: new Date().toISOString() });
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(data, null, 2));
-  console.log(`📜 Logged result: ${winner} (${total} cats)`);
 }
 
 /* -----------------------------------------------------
@@ -130,7 +112,7 @@ async function startBattle(ctx) {
     ];
   };
 
-  // Allow timer reset
+  // Timer reset (when someone joins last second)
   gameState.resetJoinTimer = () => {
     announce(ctx, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
     gameState.timers.forEach((t) => clearTimeout(t));
@@ -285,28 +267,16 @@ async function handleRoll(ctx) {
   if (duel.rolls[name]) return ctx.reply("🐾 You already rolled!");
 
   const diceOptions = [
-    { emoji: "🎲", text: "rolls a", max: 6 },
-    { emoji: "🎯", text: "hits a bullseye (score", max: 6 },
-    { emoji: "🏀", text: "scores", max: 5 },
-    { emoji: "🎳", text: "knocks down", max: 6 },
-    { emoji: "🎰", text: "pulls", max: 64 },
+    "🎲", "🎯", "🏀", "🎳", "🎰"
   ];
-  const dice = pick(diceOptions);
-
-  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji: dice.emoji });
+  const emoji = pick(diceOptions);
+  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji });
   const roll = diceMsg.dice.value;
+
   duel.rolls[name] = roll;
+  await ctx.telegram.sendMessage(ctx.chat.id, `${emoji} ${name} rolled a *${roll}*!`, { parse_mode: "Markdown" });
 
-  await ctx.telegram.sendMessage(
-    ctx.chat.id,
-    `${dice.emoji} ${name} ${dice.text} *${roll}*!`,
-    { parse_mode: "Markdown" }
-  );
-
-  if (
-    duel.rolls[duel.playerA] !== undefined &&
-    duel.rolls[duel.playerB] !== undefined
-  ) {
+  if (duel.rolls[duel.playerA] && duel.rolls[duel.playerB]) {
     clearTimeout(duel.timeout);
     resolveDuel(ctx);
   }
@@ -340,16 +310,16 @@ function resolveDuel(ctx) {
   }
 }
 
+/* -----------------------------------------------------
+ *  Normal Events
+ * ----------------------------------------------------- */
+
 function eliminatePlayers(ctx, players) {
   for (const p of players) {
     gameState.alive = gameState.alive.filter((x) => x !== p);
     gameState.dead.push(p);
   }
 }
-
-/* -----------------------------------------------------
- *  Normal Events
- * ----------------------------------------------------- */
 
 function killEvent(ctx) {
   if (gameState.alive.length < 2) return;
@@ -391,12 +361,8 @@ function endBattle(ctx) {
   const isDraw = Math.random() < CONFIG.DRAW_CHANCE;
 
   if (isDraw) {
-    announce(
-      ctx,
-      "😺 The battle ends in a *draw!* The cats are too chill to keep fighting.\nEveryone curls up for a group nap. 💤"
-    );
+    announce(ctx, "😺 The battle ends in a *draw!* Everyone curls up for a nap. 💤");
     announce(ctx, "✨ Thanks for playing Chilled Cat Battle Royale! ✨");
-    logWinner("DRAW", gameState.alive.length + gameState.dead.length);
     return;
   }
 
@@ -414,38 +380,10 @@ function endBattle(ctx) {
     i++;
     if (i >= spinFrames.length) {
       clearInterval(spinInterval);
-      announce(
-        ctx,
-        `🏆 *${winner}* emerges victorious!\nThey are now crowned the **Chillest Cat Alive™!** 😼`
-      );
-      announce(
-        ctx,
-        "🎉 Congratulations! The Battle Royale has ended.\nThanks for playing *Chilled Cat Battle Royale!*"
-      );
-      logWinner(winner, gameState.alive.length + gameState.dead.length);
+      announce(ctx, `🏆 *${winner}* emerges victorious!\nThey are now crowned the **Chillest Cat Alive™!** 😼`);
+      announce(ctx, "🎉 The Battle Royale has ended. Thanks for playing, meow!");
     }
   }, 800);
-}
-
-/* -----------------------------------------------------
- *  History Command
- * ----------------------------------------------------- */
-function showHistory(ctx) {
-  const data = readHistory();
-  if (!data.length) return ctx.reply("📜 No battle history yet, meow~");
-
-  const recent = data.slice(-5).reverse();
-  let msg = "📜 *Recent Battle Royale Results:*\n\n";
-  for (const r of recent) {
-    const date = new Date(r.date).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    msg += `🏁 ${date} — *${r.winner}* (${r.participants} cats)\n`;
-  }
-  ctx.reply(msg, { parse_mode: "Markdown" });
 }
 
 /* -----------------------------------------------------
@@ -457,7 +395,6 @@ function setupBattleRoyale(bot) {
     const text = ctx.message.text.trim().toLowerCase();
     if (text.includes("start")) return startBattle(ctx);
     if (text.includes("cancel")) return cancelBattle(ctx);
-    if (text.includes("history")) return showHistory(ctx);
 
     return ctx.reply(
       "😺 *Chilled Cat Battle Royale*\n\n" +
@@ -465,9 +402,8 @@ function setupBattleRoyale(bot) {
         "🐾 `/battleroyale start` — Start a new match (admin only)\n" +
         "😼 `/joinbr` — Join an active battle\n" +
         "💀 `/brforfeit` — Forfeit mid-battle\n" +
-        "📜 `/battleroyale history` — View recent results\n" +
-        "📊 `/battlestatus` — Check battle status\n" +
         "🎲 `/roll` — Roll during a duel\n" +
+        "📊 `/battlestatus` — Check current status\n" +
         "❌ `/battleroyale cancel` — Cancel a match (admin only)",
       { parse_mode: "Markdown" }
     );
@@ -476,7 +412,21 @@ function setupBattleRoyale(bot) {
   bot.command("joinbr", (ctx) => joinBattle(ctx));
   bot.command("brforfeit", (ctx) => forfeitBattle(ctx));
   bot.command("roll", (ctx) => handleRoll(ctx));
-  bot.command("battleroyale_history", (ctx) => showHistory(ctx));
+
+  bot.command("battlestatus", (ctx) => {
+    if (!gameState.active)
+      return ctx.reply("😿 No active Battle Royale right now.");
+
+    let msg = `📊 *Battle Status*\n\n😼 Alive: *${gameState.alive.length}*\n💀 Dead: *${gameState.dead.length}*\n\n`;
+
+    if (gameState.alive.length) msg += `🐾 Alive Cats:\n${gameState.alive.join(", ")}\n\n`;
+    if (gameState.dead.length) msg += `🪦 Fallen Cats:\n${gameState.dead.join(", ")}\n\n`;
+
+    if (duel.active) msg += `⚔️ *Duel in progress:* ${duel.playerA} vs ${duel.playerB}\n`;
+    else msg += "😺 No duel active right now.";
+
+    ctx.reply(msg, { parse_mode: "Markdown" });
+  });
 
   console.log("✅ Battle Royale commands registered.");
 }
@@ -490,5 +440,4 @@ module.exports = {
   joinBattle,
   forfeitBattle,
   cancelBattle,
-  showHistory,
 };
