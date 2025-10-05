@@ -111,41 +111,44 @@ async function startBattle(ctx) {
     `🐾 *${ctx.from.first_name}* has opened the **Chilled Cat Battle Royale!**\nType /joinbr to enter — gates close in 60 seconds!`
   );
 
-  const startJoinTimers = () => {
-    gameState.timers.forEach((t) => clearTimeout(t));
-    gameState.timers = [
-      setTimeout(() => {
-        if (gameState.active && gameState.joinOpen)
-          announce(ctx, "⏳ 30 seconds left to join!");
-      }, CONFIG.JOIN_DURATION - 30000),
+const startJoinTimers = () => {
+  gameState.timers.forEach((t) => clearTimeout(t));
+  gameState.timers = [
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen)
+        announce(ctx, "⏳ 30 seconds left to join! Type /joinbr to enter!");
+    }, CONFIG.JOIN_DURATION - 30000),
 
-      setTimeout(() => {
-        if (gameState.active && gameState.joinOpen)
-          announce(ctx, "⏳ 10 seconds left!");
-      }, CONFIG.JOIN_DURATION - 10000),
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen)
+        announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
+    }, CONFIG.JOIN_DURATION - 10000),
 
-      setTimeout(() => {
-        if (gameState.active && gameState.joinOpen) startRounds(ctx);
-      }, CONFIG.JOIN_DURATION),
-    ];
-  };
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen) startRounds(ctx);
+    }, CONFIG.JOIN_DURATION),
+  ];
+};
 
-  startJoinTimers();
+// Allow timer reset (used when a new challenger joins last-second)
+gameState.resetJoinTimer = () => {
+  announce(ctx, "⚡ A new challenger has entered! Timer reset to 30 seconds!");
+  gameState.timers.forEach((t) => clearTimeout(t));
+  gameState.timers = [
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen)
+        announce(ctx, "⏳ 15 seconds left to join! Type /joinbr to enter!");
+    }, CONFIG.RESET_JOIN_TIME - 15000),
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen)
+        announce(ctx, "⏳ 10 seconds left! Type /joinbr to enter!");
+    }, CONFIG.RESET_JOIN_TIME - 10000),
+    setTimeout(() => {
+      if (gameState.active && gameState.joinOpen) startRounds(ctx);
+    }, CONFIG.RESET_JOIN_TIME),
+  ];
+};
 
-  // Allow timer reset
-  gameState.resetJoinTimer = () => {
-    announce(ctx, "⏳ New challenger entered! Timer reset to 30 seconds!");
-    gameState.timers.forEach((t) => clearTimeout(t));
-    gameState.timers = [
-      setTimeout(() => {
-        if (gameState.active && gameState.joinOpen)
-          announce(ctx, "⏳ 10 seconds left!");
-      }, CONFIG.RESET_JOIN_TIME - 10000),
-      setTimeout(() => {
-        if (gameState.active && gameState.joinOpen) startRounds(ctx);
-      }, CONFIG.RESET_JOIN_TIME),
-    ];
-  };
 }
 
 function joinBattle(ctx) {
@@ -160,18 +163,19 @@ function joinBattle(ctx) {
 
   // Calculate remaining join time
   const elapsed = Date.now() - gameState.startTime;
-  const remainingSec = Math.max(0, Math.floor((CONFIG.JOIN_DURATION - elapsed) / 1000));
+  let remainingSec = Math.max(0, Math.floor((CONFIG.JOIN_DURATION - elapsed) / 1000));
 
-  // Reset timer if joined too late
+  // If joined too late, reset timer and override remainingSec
   if (remainingSec <= CONFIG.RESET_JOIN_THRESHOLD / 1000) {
     gameState.startTime = Date.now();
     gameState.resetJoinTimer();
+    remainingSec = CONFIG.RESET_JOIN_TIME / 1000; // 👈 Force display to 30 seconds
   }
 
-  // Announce join + how much time left
+  // Announce join and remaining time
   announce(
     ctx,
-    `😺 ${name} has joined the battle!\nType /joinbr to enter — gates close in *${remainingSec > 0 ? remainingSec : CONFIG.RESET_JOIN_TIME / 1000} seconds!*`
+    `😺 ${name} has joined the battle!\nType /joinbr to enter — gates close in *${remainingSec} seconds!*`
   );
 }
 
