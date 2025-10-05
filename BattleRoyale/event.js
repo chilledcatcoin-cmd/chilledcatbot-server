@@ -25,3 +25,4 @@ exports.doubleKillEvents = [
   "{A} tries to ambush {B}, but both fall into the Chill Pit.",
   "{A} and {B} duel with laser pointers — nobody survives."
 ];
+
