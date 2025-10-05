@@ -54,12 +54,12 @@ let duel = {
  * ----------------------------------------------------- */
 async function sendCatEmoji(ctx, emojiId, text) {
   try {
-    await ctx.telegram.sendMessage(ctx.chat.id, text, {
+    await ctx.telegram.sendMessage(ctx.chat.id, `🌀 ${text}`, {
       entities: [
         {
           type: "custom_emoji",
           offset: 0,
-          length: 2,
+          length: 1,
           custom_emoji_id: emojiId,
         },
       ],
@@ -67,7 +67,7 @@ async function sendCatEmoji(ctx, emojiId, text) {
     });
   } catch (err) {
     console.error("Emoji send failed:", err);
-    ctx.reply(text); // fallback
+    await ctx.reply(text);
   }
 }
 
@@ -288,7 +288,11 @@ function doRound(ctx) {
     );
   }
 
-  if (Math.random() < 0.1 && gameState.alive.length >= 2) return triggerDuel(ctx);
+  // ✅ Stop after starting a duel
+  if (Math.random() < 0.1 && gameState.alive.length >= 2) {
+    triggerDuel(ctx);
+    return;
+  }
 
   const roll = Math.random();
   if (roll < 0.6) killEvent(ctx);
@@ -354,6 +358,8 @@ function resolveDuel(ctx) {
     sendCatEmoji(ctx, emojis.CAT_FLEX, `😼 ${playerB} wins! ${playerA} is eliminated!`),
       eliminate(ctx, [playerA]);
   else sendCatEmoji(ctx, emojis.CAT_ASS, `💥 It's a tie! Both perish!`), eliminate(ctx, [playerA, playerB]);
+
+gameState.alive = gameState.alive.filter(p => !gameState.dead.includes(p));
 }
 
 /* -----------------------------------------------------
