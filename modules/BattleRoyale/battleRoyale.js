@@ -243,16 +243,35 @@ function startRounds(ctx) {
 
   sendCatEmoji(ctx, emojis.CAT_WAVE, "⏰ Time’s up! The arena fills with fog... Let the chaos begin!");
 
+  // ✅ Clone telegram + chatId so ctx expiry doesn't break loop
+  const telegram = ctx.telegram;
+  const chatId = ctx.chat.id;
+
+  const safeCtx = {
+    telegram,
+    chat: { id: chatId },
+  };
+
+  console.log("⚙️ Battle started. Alive:", gameState.alive.length);
+
   const interval = setInterval(() => {
-    if (!gameState.active) return clearInterval(interval);
+    if (!gameState.active) {
+      console.log("🛑 Battle stopped (inactive)");
+      return clearInterval(interval);
+    }
+
     if (gameState.alive.length <= 1) {
-      endBattle(ctx);
+      console.log("🏁 Ending battle...");
+      endBattle(safeCtx);
       clearInterval(interval);
       return;
     }
-    doRound(ctx);
+
+    console.log("🎮 Executing round", gameState.rounds + 1);
+    doRound(safeCtx);
   }, CONFIG.ROUND_INTERVAL);
 }
+
 
 /* -----------------------------------------------------
  *  Rounds & Duels
