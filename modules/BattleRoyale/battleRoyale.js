@@ -16,6 +16,19 @@ const {
   doubleKillEvents,
 } = require("./events");
 
+// ================================
+// ⚙️ CONFIGURATION
+// ================================
+const CONFIG = {
+  JOIN_DURATION: 60000,       // 60s to join at start
+  DUEL_TIMEOUT: 15000,        // 15s for duel rolls
+  ROUND_INTERVAL: 10000,      // 10s between round events
+  RESET_JOIN_THRESHOLD: 5000, // if someone joins under 5s left → reset to 30s
+  RESET_JOIN_TIME: 30000,     // reset join timer to 30s
+  DRAW_CHANCE: 0.001,         // 0.1% chance of peaceful draw
+  STATUS_EVERY_N_ROUNDS: 3,   // Post battle status every 3 rounds automatically
+};
+
 const HISTORY_FILE = path.join(__dirname, "battle_history.json");
 
 // Game state in memory
@@ -25,30 +38,37 @@ let gameState = {
   alive: [],
   dead: [],
   startTime: null,
+  timers: [],
+  rounds: 0,
+};
+
+// Duel state
+let duel = {
+  active: false,
+  playerA: null,
+  playerB: null,
+  rolls: {},
+  timeout: null,
 };
 
 /* -----------------------------------------------------
  * Helper Functions
  * ----------------------------------------------------- */
 
-/** Send a message safely to the group. */
 function announce(ctx, msg) {
   ctx.telegram.sendMessage(ctx.chat.id, msg, { parse_mode: "Markdown" });
 }
 
-/** Random utility picker */
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/** Randomly choose two distinct players */
 function pickPair() {
   const a = pick(gameState.alive);
   let b = pick(gameState.alive.filter((x) => x !== a));
   return [a, b];
 }
 
-/** Safely load battle history file */
 function readHistory() {
   try {
     return JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
@@ -57,7 +77,6 @@ function readHistory() {
   }
 }
 
-/** Append a record to the battle history */
 function logWinner(winner, total) {
   const data = readHistory();
   data.push({ winner, participants: total, date: new Date().toISOString() });
@@ -66,10 +85,9 @@ function logWinner(winner, total) {
 }
 
 /* -----------------------------------------------------
- *  Game Lifecycle Functions
+ *  Game Lifecycle
  * ----------------------------------------------------- */
 
-/** Admin starts a new Battle Royale */
 async function startBattle(ctx) {
   const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
   if (member.status !== "administrator" && member.status !== "creator") {
@@ -84,6 +102,8 @@ async function startBattle(ctx) {
     alive: [],
     dead: [],
     startTime: Date.now(),
+    timers: [],
+    rounds: 0,
   };
 
   announce(
@@ -91,50 +111,73 @@ async function startBattle(ctx) {
     `🐾 *${ctx.from.first_name}* has opened the **Chilled Cat Battle Royale!**\nType /joinbr to enter — gates close in 60 seconds!`
   );
 
-// Store join phase timers so they can be cleared if cancelled
-gameState.timers = [
-  setTimeout(() => {
-    if (gameState.active && gameState.joinOpen) announce(ctx, "⏳ 30 seconds left to join!");
-  }, 30000),
+  const startJoinTimers = () => {
+    gameState.timers.forEach((t) => clearTimeout(t));
+    gameState.timers = [
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 30 seconds left to join!");
+      }, CONFIG.JOIN_DURATION - 30000),
 
-  setTimeout(() => {
-    if (gameState.active && gameState.joinOpen) announce(ctx, "⏳ 10 seconds left!");
-  }, 50000),
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 10 seconds left!");
+      }, CONFIG.JOIN_DURATION - 10000),
 
-  setTimeout(() => {
-    if (gameState.active && gameState.joinOpen) startRounds(ctx);
-  }, 60000),
-];
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen) startRounds(ctx);
+      }, CONFIG.JOIN_DURATION),
+    ];
+  };
+
+  startJoinTimers();
+
+  // Allow timer reset
+  gameState.resetJoinTimer = () => {
+    announce(ctx, "⏳ New challenger entered! Timer reset to 30 seconds!");
+    gameState.timers.forEach((t) => clearTimeout(t));
+    gameState.timers = [
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen)
+          announce(ctx, "⏳ 10 seconds left!");
+      }, CONFIG.RESET_JOIN_TIME - 10000),
+      setTimeout(() => {
+        if (gameState.active && gameState.joinOpen) startRounds(ctx);
+      }, CONFIG.RESET_JOIN_TIME),
+    ];
+  };
 }
 
-/** Player joins the match */
 function joinBattle(ctx) {
-  if (!gameState.active || !gameState.joinOpen) {
+  if (!gameState.active || !gameState.joinOpen)
     return ctx.reply("No active Battle Royale. Wait for an admin to start one.");
-  }
 
   const name = `@${ctx.from.username || ctx.from.first_name}`;
   if (gameState.alive.includes(name)) return ctx.reply("😼 You’re already in!");
 
   gameState.alive.push(name);
   announce(ctx, `😺 ${name} has joined the battle!`);
+
+  const joinElapsed = Date.now() - gameState.startTime;
+  const remaining = CONFIG.JOIN_DURATION - joinElapsed;
+  if (remaining < CONFIG.RESET_JOIN_THRESHOLD) {
+    gameState.startTime = Date.now();
+    gameState.resetJoinTimer();
+  }
 }
 
-/** Player forfeits mid-match */
 function forfeitBattle(ctx) {
   if (!gameState.active) return ctx.reply("No battle running right now.");
 
   const name = `@${ctx.from.username || ctx.from.first_name}`;
-  if (!gameState.alive.includes(name)) {
+  if (!gameState.alive.includes(name))
     return ctx.reply("You’re not part of this match, silly cat.");
-  }
 
   gameState.alive = gameState.alive.filter((p) => p !== name);
   gameState.dead.push(name);
   announce(ctx, `💀 ${name} has forfeited and left the arena.`);
 }
 
-/** Admin cancels a match */
 async function cancelBattle(ctx) {
   const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
   if (member.status !== "administrator" && member.status !== "creator") {
@@ -143,38 +186,18 @@ async function cancelBattle(ctx) {
 
   if (!gameState.active) return ctx.reply("No battle to cancel.");
   gameState.active = false;
-// Clear all pending timers
-if (gameState.timers) {
-  for (const t of gameState.timers) clearTimeout(t);
-  gameState.timers = [];
-}
+  if (gameState.timers) gameState.timers.forEach((t) => clearTimeout(t));
   announce(ctx, "❌ The Chilled Cat Battle Royale has been cancelled.");
 }
 
-/** Show recent results */
-function showHistory(ctx) {
-  const data = readHistory();
-  if (!data.length) return ctx.reply("No battle history yet 😿");
-
-  const recent = data.slice(-5).reverse();
-  let msg = "📜 *Recent Battle Royale Results:*\n\n";
-  for (const r of recent) {
-    const date = new Date(r.date).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    msg += `🏁 ${date} — *${r.winner}* (${r.participants} cats)\n`;
-  }
-  ctx.reply(msg, { parse_mode: "Markdown" });
-}
-
 /* -----------------------------------------------------
- *  Game Engine (Rounds + Events)
+ *  Battle Flow
  * ----------------------------------------------------- */
+
 function startRounds(ctx) {
   gameState.joinOpen = false;
+  gameState.rounds = 0;
+
   if (gameState.alive.length < 2) {
     announce(ctx, "😿 Not enough cats joined. Battle cancelled.");
     gameState.active = false;
@@ -191,16 +214,133 @@ function startRounds(ctx) {
       return;
     }
     doRound(ctx);
-  }, 10000);
+  }, CONFIG.ROUND_INTERVAL);
 }
 
+/* -----------------------------------------------------
+ *  Rounds and Events
+ * ----------------------------------------------------- */
+
 function doRound(ctx) {
+  gameState.rounds++;
+
+  // Auto status reminder
+  if (gameState.rounds % CONFIG.STATUS_EVERY_N_ROUNDS === 0) {
+    let msg = `📢 *Round ${gameState.rounds} Update!*\n\n`;
+    msg += `😼 Alive: *${gameState.alive.length}*\n💀 Dead: *${gameState.dead.length}*\n\n`;
+    msg += duel.active
+      ? `⚔️ Duel in progress: ${duel.playerA} vs ${duel.playerB}\n`
+      : `🌪️ The battle rages on...`;
+    announce(ctx, msg);
+  }
+
+  // 10% chance of duel
+  if (Math.random() < 0.1 && gameState.alive.length >= 2) {
+    triggerDuel(ctx);
+    return;
+  }
+
   const roll = Math.random();
   if (roll < 0.6) killEvent(ctx);
   else if (roll < 0.8) chillEvent(ctx);
   else if (roll < 0.95) reviveEvent(ctx);
   else doubleKillEvent(ctx);
 }
+
+/* -----------------------------------------------------
+ *  Duels
+ * ----------------------------------------------------- */
+
+function triggerDuel(ctx) {
+  if (duel.active) return;
+
+  const [A, B] = pickPair();
+  duel = { active: true, playerA: A, playerB: B, rolls: {} };
+
+  announce(
+    ctx,
+    `⚔️ A duel has begun between ${A} and ${B}!\nThey have *${CONFIG.DUEL_TIMEOUT / 1000} seconds* to /roll — highest roll survives!`
+  );
+
+  duel.timeout = setTimeout(() => {
+    resolveDuel(ctx);
+  }, CONFIG.DUEL_TIMEOUT);
+}
+
+async function handleRoll(ctx) {
+  const name = `@${ctx.from.username || ctx.from.first_name}`;
+
+  if (!duel.active) return ctx.reply("🎮 There’s no active duel right now!");
+  if (![duel.playerA, duel.playerB].includes(name))
+    return ctx.reply("😼 You’re not part of the current duel!");
+  if (duel.rolls[name]) return ctx.reply("🐾 You already rolled!");
+
+  const diceOptions = [
+    { emoji: "🎲", text: "rolls a", max: 6 },
+    { emoji: "🎯", text: "hits a bullseye (score", max: 6 },
+    { emoji: "🏀", text: "scores", max: 5 },
+    { emoji: "🎳", text: "knocks down", max: 6 },
+    { emoji: "🎰", text: "pulls", max: 64 },
+  ];
+  const dice = pick(diceOptions);
+
+  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji: dice.emoji });
+  const roll = diceMsg.dice.value;
+  duel.rolls[name] = roll;
+
+  await ctx.telegram.sendMessage(
+    ctx.chat.id,
+    `${dice.emoji} ${name} ${dice.text} *${roll}*!`,
+    { parse_mode: "Markdown" }
+  );
+
+  if (
+    duel.rolls[duel.playerA] !== undefined &&
+    duel.rolls[duel.playerB] !== undefined
+  ) {
+    clearTimeout(duel.timeout);
+    resolveDuel(ctx);
+  }
+}
+
+function resolveDuel(ctx) {
+  const { playerA, playerB, rolls } = duel;
+  duel.active = false;
+
+  const rollA = rolls[playerA];
+  const rollB = rolls[playerB];
+
+  if (rollA === undefined && rollB === undefined) {
+    announce(ctx, `💀 Neither ${playerA} nor ${playerB} rolled! Both perish.`);
+    eliminatePlayers(ctx, [playerA, playerB]);
+  } else if (rollA === undefined) {
+    announce(ctx, `💀 ${playerA} failed to roll and is eliminated!`);
+    eliminatePlayers(ctx, [playerA]);
+  } else if (rollB === undefined) {
+    announce(ctx, `💀 ${playerB} failed to roll and is eliminated!`);
+    eliminatePlayers(ctx, [playerB]);
+  } else if (rollA > rollB) {
+    announce(ctx, `😼 ${playerA} wins the duel! ${playerB} has been eliminated!`);
+    eliminatePlayers(ctx, [playerB]);
+  } else if (rollB > rollA) {
+    announce(ctx, `😼 ${playerB} wins the duel! ${playerA} has been eliminated!`);
+    eliminatePlayers(ctx, [playerA]);
+  } else {
+    announce(ctx, `💥 It's a tie! Both ${playerA} and ${playerB} are eliminated!`);
+    eliminatePlayers(ctx, [playerA, playerB]);
+  }
+}
+
+function eliminatePlayers(ctx, players) {
+  for (const p of players) {
+    gameState.alive = gameState.alive.filter((x) => x !== p);
+    gameState.dead.push(p);
+  }
+}
+
+/* -----------------------------------------------------
+ *  Normal Events
+ * ----------------------------------------------------- */
 
 function killEvent(ctx) {
   if (gameState.alive.length < 2) return;
@@ -234,13 +374,12 @@ function reviveEvent(ctx) {
 }
 
 /* -----------------------------------------------------
- *  End Game Sequence
+ *  End Game
  * ----------------------------------------------------- */
+
 function endBattle(ctx) {
   gameState.active = false;
-
-  // 0.1% draw chance
-  const isDraw = Math.random() < 0.001;
+  const isDraw = Math.random() < CONFIG.DRAW_CHANCE;
 
   if (isDraw) {
     announce(
@@ -280,8 +419,9 @@ function endBattle(ctx) {
 }
 
 /* -----------------------------------------------------
- *  Command Registration (used by commands.js)
+ *  Commands
  * ----------------------------------------------------- */
+
 function setupBattleRoyale(bot) {
   bot.command("battleroyale", async (ctx) => {
     const text = ctx.message.text.trim().toLowerCase();
@@ -296,6 +436,8 @@ function setupBattleRoyale(bot) {
         "😼 `/joinbr` — Join an active battle\n" +
         "💀 `/brforfeit` — Forfeit mid-battle\n" +
         "📜 `/battleroyale history` — View recent results\n" +
+        "🎲 `/roll` — Roll during a duel\n" +
+        "📊 `/battlestatus` — Check battle status\n" +
         "❌ `/battleroyale cancel` — Cancel a match (admin only)",
       { parse_mode: "Markdown" }
     );
@@ -303,6 +445,40 @@ function setupBattleRoyale(bot) {
 
   bot.command("joinbr", (ctx) => joinBattle(ctx));
   bot.command("brforfeit", (ctx) => forfeitBattle(ctx));
+  bot.command("roll", (ctx) => handleRoll(ctx));
+
+  /* -------------------------------
+     📊 Battle Status Command
+     ------------------------------- */
+  bot.command("battlestatus", (ctx) => {
+    if (!gameState.active)
+      return ctx.reply("😿 No active Battle Royale right now.");
+
+    const aliveCount = gameState.alive.length;
+    const deadCount = gameState.dead.length;
+
+    let msg = `📊 *Battle Royale Status*\n\n`;
+    msg += `😼 Alive: *${aliveCount}*\n💀 Dead: *${deadCount}*\n\n`;
+
+    if (aliveCount > 0)
+      msg += `🐾 Alive Cats:\n${gameState.alive.join(", ")}\n\n`;
+    if (deadCount > 0)
+      msg += `🪦 Fallen Cats:\n${gameState.dead.join(", ")}\n\n`;
+
+    if (duel.active) {
+      msg += `⚔️ *Duel in progress!*\n${duel.playerA} vs ${duel.playerB}\n`;
+      if (Object.keys(duel.rolls).length > 0) {
+        msg += `🎲 Rolls so far: ${Object.entries(duel.rolls)
+          .map(([p, v]) => `${p}: ${v}`)
+          .join(", ")}\n`;
+      }
+    } else {
+      msg += "😺 No duel active right now.";
+    }
+
+    ctx.reply(msg, { parse_mode: "Markdown" });
+  });
+
   console.log("✅ Battle Royale commands registered.");
 }
 
@@ -315,5 +491,4 @@ module.exports = {
   joinBattle,
   forfeitBattle,
   cancelBattle,
-  showHistory,
 };
