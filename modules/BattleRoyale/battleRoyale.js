@@ -153,17 +153,26 @@ function joinBattle(ctx) {
     return ctx.reply("No active Battle Royale. Wait for an admin to start one.");
 
   const name = `@${ctx.from.username || ctx.from.first_name}`;
-  if (gameState.alive.includes(name)) return ctx.reply("😼 You’re already in!");
+  if (gameState.alive.includes(name))
+    return ctx.reply("😼 You’re already in!");
 
   gameState.alive.push(name);
-  announce(ctx, `😺 ${name} has joined the battle!`);
 
-  const joinElapsed = Date.now() - gameState.startTime;
-  const remaining = CONFIG.JOIN_DURATION - joinElapsed;
-  if (remaining < CONFIG.RESET_JOIN_THRESHOLD) {
+  // Calculate remaining join time
+  const elapsed = Date.now() - gameState.startTime;
+  const remainingSec = Math.max(0, Math.floor((CONFIG.JOIN_DURATION - elapsed) / 1000));
+
+  // Reset timer if joined too late
+  if (remainingSec <= CONFIG.RESET_JOIN_THRESHOLD / 1000) {
     gameState.startTime = Date.now();
     gameState.resetJoinTimer();
   }
+
+  // Announce join + how much time left
+  announce(
+    ctx,
+    `😺 ${name} has joined the battle!\nType /joinbr to enter — gates close in *${remainingSec > 0 ? remainingSec : CONFIG.RESET_JOIN_TIME / 1000} seconds!*`
+  );
 }
 
 function forfeitBattle(ctx) {
