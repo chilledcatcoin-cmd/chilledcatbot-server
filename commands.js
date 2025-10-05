@@ -171,27 +171,17 @@ function setupCommands(bot) {
   /* -------------------------------
      Battle Royale Commands
      ------------------------------- */
-  bot.command("battleroyale", async (ctx) => {
-    const text = ctx.message.text.trim().toLowerCase();
 
-    if (text.includes("start")) return startBattle(ctx);
-    if (text.includes("cancel")) return cancelBattle(ctx);
-    if (text.includes("history")) return showHistory(ctx);
-
-    return ctx.reply(
-      "😺 *Chilled Cat Battle Royale*\n\n" +
-        "Commands:\n" +
-        "🐾 `/battleroyale start` — Start a new match (admin only)\n" +
-        "😼 `/joinbr` — Join the current battle\n" +
-        "💀 `/brforfeit` — Forfeit mid-battle\n" +
-        "📜 `/battleroyale history` — View recent results\n" +
-        "❌ `/battleroyale cancel` — Cancel a match (admin only)",
-      { parse_mode: "Markdown" }
-    );
-  });
-
-  bot.command("joinbr", (ctx) => joinBattle(ctx));
-  bot.command("brforfeit", (ctx) => forfeitBattle(ctx));
+  bot.telegram.setMyCommands([
+    { command: "brstart", description: "Start a new Battle Royale (admin)" },
+    { command: "brcancel", description: "Cancel the current Battle Royale" },
+    { command: "brforceend", description: "Force-end and declare a winner" },
+    { command: "brjoin", description: "Join the current battle" },
+    { command: "brleave", description: "Leave or forfeit" },
+    { command: "roll", description: "Roll during a duel" },
+    { command: "brstatus", description: "Check current battle status" },
+    { command: "br", description: "Show Battle Royale help" },
+   ]).then(() => console.log("✅ Telegram command list updated."));
 
   console.log("✅ Battle Royale commands registered.");
 

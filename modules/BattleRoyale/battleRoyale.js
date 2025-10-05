@@ -404,22 +404,17 @@ function sendStatus(ctx) {
 }
 
 function sendHelp(ctx) {
-  return ctx.reply(
-    "😺 *Chilled Cat Battle Royale Commands*\n\nTap a button below to send the command:",
-    {
-      parse_mode: "Markdown",
-      reply_markup: {
-        keyboard: [
-          [ { text: "/brstart" }, { text: "/brcancel" } ],
-          [ { text: "/brforceend" } ],
-          [ { text: "/brjoin" }, { text: "/brleave" } ],
-          [ { text: "/roll" }, { text: "/brstatus" } ],
-          [ { text: "/br" } ], // this is your help/about command itself
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    }
+  ctx.reply(
+    "😺 *Chilled Cat Battle Royale Commands*\n\n" +
+      "🏁 `/brstart` — Start a new battle (admin)\n" +
+      "❌ `/brcancel` — Cancel a battle (admin)\n" +
+      "💥 `/brforceend` — Force-end and declare winner (admin)\n" +
+      "🐾 `/brjoin` — Join the active battle\n" +
+      "🚪 `/brleave` — Leave or forfeit\n" +
+      "🎲 `/roll` — Roll during a duel\n" +
+      "📊 `/brstatus` — Check game status\n\n" +
+      "✨ Type `/brstart` or tap from the list below!",
+    { parse_mode: "Markdown" }
   );
 }
 
