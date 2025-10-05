@@ -46,14 +46,6 @@
  * =====================================================
  */
 
-bot.on("sticker", async (ctx) => {
-  console.log("Sticker ID:", ctx.message.sticker.file_id);
-  await ctx.reply(`🪪 Sticker file_id:\n<code>${ctx.message.sticker.file_id}</code>`, {
-    parse_mode: "HTML",
-  });
-});
-
-
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
 const { setupContests } = require("./contests");
@@ -66,6 +58,19 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
+
+bot.on("sticker", async (ctx) => {
+  try {
+    if (!ctx.message?.sticker) return;
+    const sticker = ctx.message.sticker;
+    console.log("Sticker ID:", sticker.file_id);
+    await ctx.reply(`🪪 Sticker file_id:\n<code>${sticker.file_id}</code>`, {
+      parse_mode: "HTML",
+    });
+  } catch (err) {
+    console.error("Sticker handler error:", err);
+  }
+});
 
 const bot = new Telegraf(BOT_TOKEN);
 
