@@ -79,9 +79,17 @@ setupFortune(bot);
 setupHowChill(bot);
 setupBattleRoyale(bot);
 
-// ✅ Graceful Startup & Shutdown
-bot.launch();
-console.log("😺 ChilledCatBot is online and ready to chill.");
+// ✅ Start bot safely (polling mode)
+(async () => {
+  try {
+    // 🔧 Remove any old webhook before launching polling
+    await bot.telegram.deleteWebhook();
+    await bot.launch();
+    console.log("😺 ChilledCatBot is online and ready to chill (polling mode).");
+  } catch (err) {
+    console.error("❌ Bot launch failed:", err);
+  }
+})();
 
 // Enable clean exit handling for Render / Docker
 process.once("SIGINT", () => bot.stop("SIGINT"));
