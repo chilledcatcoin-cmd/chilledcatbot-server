@@ -46,6 +46,14 @@
  * =====================================================
  */
 
+bot.on("sticker", async (ctx) => {
+  console.log("Sticker ID:", ctx.message.sticker.file_id);
+  await ctx.reply(`🪪 Sticker file_id:\n<code>${ctx.message.sticker.file_id}</code>`, {
+    parse_mode: "HTML",
+  });
+});
+
+
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
 const { setupContests } = require("./contests");
