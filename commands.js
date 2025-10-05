@@ -9,15 +9,6 @@ const { GAMES } = require("./games");
 const { getLeaderboardCached } = require("./leaderboard");
 const { contests, startContest, endContest } = require("./contests");
 
-// 🧩 Battle Royale Module
-const {
-  startBattle,
-  joinBattle,
-  forfeitBattle,
-  cancelBattle,
-  showHistory,
-} = require("./modules/BattleRoyale/battleRoyale");
-
 /* -------------------------------
    Leaderboard Sender
    ------------------------------- */
@@ -169,21 +160,29 @@ function setupCommands(bot) {
   });
 
   /* -------------------------------
-     Battle Royale Commands
+     Telegram Command Menu (for / menu)
      ------------------------------- */
 
-  bot.telegram.setMyCommands([
-    { command: "brstart", description: "Start a new Battle Royale (admin)" },
-    { command: "brcancel", description: "Cancel the current Battle Royale" },
-    { command: "brforceend", description: "Force-end and declare a winner" },
-    { command: "brjoin", description: "Join the current battle" },
-    { command: "brleave", description: "Leave or forfeit" },
-    { command: "roll", description: "Roll during a duel" },
-    { command: "brstatus", description: "Check current battle status" },
-    { command: "br", description: "Show Battle Royale help" },
-   ]).then(() => console.log("✅ Telegram command list updated."));
+  bot.telegram
+    .setMyCommands([
+      { command: "flappycat", description: "Play Flappy Cat" },
+      { command: "catsweeper", description: "Play CatSweeper" },
+      { command: "brstart", description: "Start a new Battle Royale (admin)" },
+      { command: "brcancel", description: "Cancel the current Battle Royale" },
+      { command: "brforceend", description: "Force-end and declare a winner" },
+      { command: "brjoin", description: "Join the current battle" },
+      { command: "brleave", description: "Leave or forfeit" },
+      { command: "roll", description: "Roll during a duel" },
+      { command: "brstatus", description: "Check current battle status" },
+      { command: "leaderboard", description: "View game leaderboards" },
+      { command: "startcontest", description: "Start a contest (admin)" },
+      { command: "endcontest", description: "End the active contest" },
+    ])
+    .then(() => console.log("✅ Telegram command list updated."));
 
-  console.log("✅ Battle Royale commands registered.");
+  console.log("✅ General commands registered.");
+}
+
 
   /* -------------------------------
      Game Launch via Callback
