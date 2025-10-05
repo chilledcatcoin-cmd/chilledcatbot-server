@@ -91,10 +91,20 @@ async function startBattle(ctx) {
     `🐾 *${ctx.from.first_name}* has opened the **Chilled Cat Battle Royale!**\nType /joinbr to enter — gates close in 60 seconds!`
   );
 
-  // Timed join notices
-  setTimeout(() => announce(ctx, "⏳ 30 seconds left to join!"), 30000);
-  setTimeout(() => announce(ctx, "⏳ 10 seconds left!"), 50000);
-  setTimeout(() => startRounds(ctx), 60000);
+// Store join phase timers so they can be cleared if cancelled
+gameState.timers = [
+  setTimeout(() => {
+    if (gameState.active && gameState.joinOpen) announce(ctx, "⏳ 30 seconds left to join!");
+  }, 30000),
+
+  setTimeout(() => {
+    if (gameState.active && gameState.joinOpen) announce(ctx, "⏳ 10 seconds left!");
+  }, 50000),
+
+  setTimeout(() => {
+    if (gameState.active && gameState.joinOpen) startRounds(ctx);
+  }, 60000),
+];
 }
 
 /** Player joins the match */
@@ -133,6 +143,11 @@ async function cancelBattle(ctx) {
 
   if (!gameState.active) return ctx.reply("No battle to cancel.");
   gameState.active = false;
+// Clear all pending timers
+if (gameState.timers) {
+  for (const t of gameState.timers) clearTimeout(t);
+  gameState.timers = [];
+}
   announce(ctx, "❌ The Chilled Cat Battle Royale has been cancelled.");
 }
 
