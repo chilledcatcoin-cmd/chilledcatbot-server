@@ -357,6 +357,49 @@ function resolveDuel(ctx) {
 }
 
 /* -----------------------------------------------------
+ *  Utility: Eliminate players from alive list
+ * ----------------------------------------------------- */
+function eliminate(ctx, players) {
+  for (const p of players) {
+    gameState.alive = gameState.alive.filter((x) => x !== p);
+    if (!gameState.dead.includes(p)) gameState.dead.push(p);
+  }
+}
+
+/* -----------------------------------------------------
+ *  Battle Events
+ * ----------------------------------------------------- */
+function killEvent(ctx) {
+  if (gameState.alive.length < 2) return;
+  const [A, B] = pickPair();
+  const msg = pick(killEvents).replace("{A}", A).replace("{B}", B);
+  eliminate(ctx, [B]);
+  sendCatEmoji(ctx, emojis.CAT_ASS, `🔥 ${msg}`);
+}
+
+function doubleKillEvent(ctx) {
+  if (gameState.alive.length < 3) return killEvent(ctx);
+  const [A, B] = pickPair();
+  const msg = pick(doubleKillEvents).replace("{A}", A).replace("{B}", B);
+  eliminate(ctx, [A, B]);
+  sendCatEmoji(ctx, emojis.CAT_SLAP_PEACH, `💥 ${msg}`);
+}
+
+function chillEvent(ctx) {
+  const msg = pick(chillEvents);
+  sendCatEmoji(ctx, emojis.CAT_NAP, msg);
+}
+
+function reviveEvent(ctx) {
+  if (gameState.dead.length === 0) return chillEvent(ctx);
+  const revived = pick(gameState.dead);
+  gameState.dead = gameState.dead.filter((p) => p !== revived);
+  gameState.alive.push(revived);
+  const msg = pick(reviveEvents).replace("{B}", revived);
+  sendCatEmoji(ctx, emojis.CAT_IDEA, msg);
+}
+
+/* -----------------------------------------------------
  *  End Game
  * ----------------------------------------------------- */
 function endBattle(ctx) {
