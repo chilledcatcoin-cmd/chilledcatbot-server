@@ -45,6 +45,13 @@
  * v1.0.0 - Initial Telegraf setup
  * =====================================================
  */
+/**
+ * =====================================================
+ * ChilledCatBot - Bot Loader - bot.js
+ * =====================================================
+ * Initializes Telegraf + loads modules
+ * =====================================================
+ */
 
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
@@ -59,7 +66,10 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
-// Load features
+// ✅ Initialize bot
+const bot = new Telegraf(BOT_TOKEN);
+
+// ✅ Load Features
 setupCommands(bot);
 setupContests(bot);
 setupGroupGuard(bot);
@@ -69,7 +79,12 @@ setupFortune(bot);
 setupHowChill(bot);
 setupBattleRoyale(bot);
 
+// ✅ Graceful Startup & Shutdown
+bot.launch();
+console.log("😺 ChilledCatBot is online and ready to chill.");
+
+// Enable clean exit handling for Render / Docker
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
+
 module.exports = { bot };
-
-
-
