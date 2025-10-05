@@ -59,30 +59,6 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
-const bot = new Telegraf(BOT_TOKEN); // ✅ Define bot BEFORE using it
-
-// Log custom emoji IDs
-bot.on("message", async (ctx) => {
-  try {
-    const entities = ctx.message?.entities || ctx.message?.caption_entities;
-    if (!entities) return;
-
-    for (const e of entities) {
-      if (e.type === "custom_emoji") {
-        const emojiText = ctx.message.text?.substring(e.offset, e.offset + e.length);
-        console.log("Custom emoji ID:", e.custom_emoji_id);
-        await ctx.reply(
-          `😸 Custom emoji detected: ${emojiText}\n<code>${e.custom_emoji_id}</code>`,
-          { parse_mode: "HTML" }
-        );
-      }
-    }
-  } catch (err) {
-    console.error("Emoji handler error:", err);
-  }
-});
-
-
 // Load features
 setupCommands(bot);
 setupContests(bot);
