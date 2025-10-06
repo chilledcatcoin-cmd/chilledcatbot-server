@@ -227,19 +227,21 @@ function nextQuestion(ctxOrChatId) {
     ]],
   };
 
+  // ✅ Display question
   global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
     reply_markup: keyboard,
     parse_mode: "Markdown",
   }).catch(err => console.error("⚠️ sendMessage failed:", err));
 
-game.timer = setTimeout(() => {
-  console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
-setTimeout(() => {
-  console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
-  setTimeout(() => checkAnswers(chatId), 4000); // 4s grace
-}, QUESTION_TIME);
-
+  // ✅ Set question timer with grace period
+  game.timer = setTimeout(() => {
+    console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
+    setTimeout(() => {
+      checkAnswers(chatId);
+    }, 4000); // 4s grace for last-moment callbacks
+  }, QUESTION_TIME);
 }
+
 
 // =====================================================
 //  CHECK ANSWERS — uses chatId directly
