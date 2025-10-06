@@ -16,35 +16,30 @@ function setupTrivia(bot) {
   // =====================================================
   //  BUTTON HANDLERS  (A / B / C / D) — must be registered early
   // =====================================================
-  bot.action(/^[ABCD]$/, async (ctx, next) => {
-    try {
-      const cbq = ctx.callbackQuery;
-      if (!cbq?.message?.chat?.id) return next();
-      const chatId = cbq.message.chat.id;
-      const userId = ctx.from.id;
-      const choice = cbq.data;
+bot.action(/^([ABCD])(@\w+)?$/, async (ctx, next) => {
+  try {
+    const cbq = ctx.callbackQuery;
+    if (!cbq?.message?.chat?.id) return next();
+    const chatId = cbq.message.chat.id;
+    const userId = ctx.from.id;
+    const choice = ctx.match[1]; // ✅ Extract A/B/C/D even with @bot suffix
 
-      const game = activeGames[chatId];
-      if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
+    const game = activeGames[chatId];
+    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
-      // prevent multiple answers per player
-      if (game.answers[userId]) {
-        return ctx.answerCbQuery("😼 You already answered!");
-      }
-
-      // record choice
-      game.answers[userId] = choice;
-      console.log(`🎯 ${ctx.from.username || userId} answered ${choice}`);
-      await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
-
-      // Per-player mode: do NOT edit the message markup (it would affect everyone)
-      // We rely on the stored answer to reject further taps from this user.
-      return;
-    } catch (err) {
-      console.error("⚠️ Trivia callback error:", err);
-      return ctx.answerCbQuery("⚠️ Error handling answer");
+    if (game.answers[userId]) {
+      return ctx.answerCbQuery("😼 You already answered!");
     }
-  });
+
+    game.answers[userId] = choice;
+    console.log(`🎯 ${ctx.from.username || userId} answered ${choice}`);
+    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
+
+  } catch (err) {
+    console.error("⚠️ Trivia callback error:", err);
+    ctx.answerCbQuery("⚠️ Error handling answer");
+  }
+});
 
   // (Optional) If some modules send "ignore" buttons, swallow them safely.
   bot.action("ignore", async (ctx) => ctx.answerCbQuery());
