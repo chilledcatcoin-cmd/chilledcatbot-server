@@ -22,7 +22,6 @@ function setupTrivia(bot) {
     await ctx.reply(message, { parse_mode: "Markdown" });
   });
 
-  // ===== /trivia =====
 // ===== /trivia =====
 bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
   const chatId = ctx.chat.id;
@@ -46,17 +45,16 @@ bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
   message += "Reply with the topic number to start.";
   await ctx.reply(message, { parse_mode: "Markdown" });
 
-  // One-time listener for the admin’s reply
+  // One-time listener for admin reply
   const onMessage = async (replyCtx) => {
     try {
-      // Ignore messages from others or other chats
       if (replyCtx.chat.id !== chatId || replyCtx.from.id !== userId) return;
 
       const text = replyCtx.message?.text?.trim();
       const index = parseInt(text);
       if (isNaN(index) || index < 1 || index > topics.length) {
         await replyCtx.reply("❌ Invalid selection. Try /trivia again.");
-        bot.off("message", onMessage);
+        bot.removeListener("message", onMessage);
         return;
       }
 
@@ -67,20 +65,19 @@ bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
       if (!questions || !questions.length) {
         await replyCtx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
         delete activeGames[chatId];
-        bot.off("message", onMessage);
+        bot.removeListener("message", onMessage);
         return;
       }
 
       await startTrivia(replyCtx, selected.key, userId);
     } finally {
-      // Always clean up listener after any outcome
-      bot.off("message", onMessage);
+      // Always clean up
+      bot.removeListener("message", onMessage);
     }
   };
 
   bot.on("message", onMessage);
 });
-
 
   // ===== /triviaskip =====
   bot.command("triviaskip", (ctx) => {
