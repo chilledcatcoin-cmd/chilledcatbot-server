@@ -236,8 +236,10 @@ function nextQuestion(ctxOrChatId) {
   }).catch(err => console.error("⚠️ sendMessage failed:", err));
 
 game.timer = setTimeout(() => {
-  console.log(`🕒 Time's up for question ${game.currentIndex + 1}, checking answers...`);
-  checkAnswers(chatId);
+  console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
+  setTimeout(() => {
+    checkAnswers(chatId);
+  }, 3500); // 3.5s grace period for late callbacks
 }, QUESTION_TIME);
 
 }
