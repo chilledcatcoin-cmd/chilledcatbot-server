@@ -70,6 +70,7 @@ const { setupFortune } = require("./modules/Fortune");
 // const { setupChillOrChaos } = require("./modules/CoC");
 const { setupHowChill } = require("./modules/HowChill");
 const { setupBattleRoyale } = require("./modules/BattleRoyale");
+const { setupTrivia } = require("./modules/Trivia");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
@@ -85,6 +86,7 @@ setupFortune(bot);
 // setupChillOrChaos(bot);
 setupHowChill(bot);
 setupBattleRoyale(bot);
+setupTrivia(bot);
 
 // ✅ Safe Polling Launch (Fix for 409 conflict)
 (async () => {
