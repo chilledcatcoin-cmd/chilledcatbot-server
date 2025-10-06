@@ -62,28 +62,42 @@ function setupTrivia(bot) {
   });
 
   // =====================================================
-  //  /trivia — start game
+  //  /trivia — start game (with fallback)
   // =====================================================
-  bot.command("trivia", async (ctx) => {
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
-    const admins = await ctx.telegram.getChatAdministrators(chatId);
-    const isAdmin = admins.some((a) => a.user.id === userId);
-    if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
 
-    if (activeGames[chatId]) return ctx.reply("A trivia game is already running here!");
-
-    const topics = getAvailableTopics();
-    let msg = "📘 *Choose a trivia topic:*\n\n";
-    topics.forEach((t, i) => {
-      msg += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
-    });
-    msg += "Reply with the topic number to start.";
-    await ctx.reply(msg, { parse_mode: "Markdown" });
-
-    bot.context.awaitingTriviaReply ??= {};
-    bot.context.awaitingTriviaReply[chatId] = userId;
+  // Fallback for when Telegram doesn't tag it as a command
+  bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
+    console.log("🔥 /trivia triggered via hears()");
+    await handleTriviaStart(ctx, bot);
   });
+
+  // Standard command trigger
+  bot.command("trivia", async (ctx) => {
+    console.log("🔥 /trivia triggered via command()");
+    await handleTriviaStart(ctx, bot);
+  });
+
+async function handleTriviaStart(ctx, bot) {
+  const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  const admins = await ctx.telegram.getChatAdministrators(chatId);
+  const isAdmin = admins.some((a) => a.user.id === userId);
+  if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
+
+  if (activeGames[chatId]) return ctx.reply("A trivia game is already running here!");
+
+  const topics = getAvailableTopics();
+  let msg = "📘 *Choose a trivia topic:*\n\n";
+  topics.forEach((t, i) => {
+    msg += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
+  });
+  msg += "Reply with the topic number to start.";
+  await ctx.reply(msg, { parse_mode: "Markdown" });
+
+  bot.context.awaitingTriviaReply ??= {};
+  bot.context.awaitingTriviaReply[chatId] = userId;
+}
+
 
   // =====================================================
   //  Handle admin topic reply
