@@ -4,7 +4,7 @@ let fortunes = [];
 
 // Load fortunes at startup
 try {
-  const data = fs.readFileSync("./config/chilled_cat_fortunes.json", "utf-8");
+  const data = fs.readFileSync("./chilled_cat_fortunes.json", "utf-8");
   fortunes = JSON.parse(data);
   console.log(`✅ Loaded ${fortunes.length} fortunes.`);
 } catch (err) {
