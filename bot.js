@@ -79,9 +79,13 @@ bot.on("callback_query", async (ctx, next) => {
   const cbq = ctx.callbackQuery;
   if (!cbq) return next();
 
-  // Ignore game launch callbacks
-  if (cbq.game_short_name) return ctx.answerCbQuery(); // ✅ Silent pass-through
+  // ✅ If it’s a game button (Flappy Cat, CatSweeper, etc.), allow launch
+  if (cbq.game_short_name) {
+    console.log(`🎮 Launching Telegram game: ${cbq.game_short_name}`);
+    return ctx.answerCbQuery(); // MUST be silent — no text, no delay
+  }
 
+  // Otherwise, handle normal callback data (Trivia, Battle Royale, etc.)
   if (cbq.data) {
     console.log("📬 GLOBAL CALLBACK RECEIVED:", cbq.data);
     await ctx.answerCbQuery("✅ Received!");
