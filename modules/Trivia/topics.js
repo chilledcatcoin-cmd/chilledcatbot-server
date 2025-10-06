@@ -1,63 +1,37 @@
 // /modules/Trivia/topics.js
-//
-// This module defines available trivia topics and
-// dynamically loads the correct question set.
-//
-// Add new topics by creating new files like:
-//   trivia_crypto.js, trivia_cats.js, trivia_memes.js
-// and registering them in the topics list below.
-//
+// Loads JS modules directly instead of JSON files.
 
-const path = require("path");
+const ton = require("./trivia_ton");
 
-const topics = {
-  ton: {
+const topics = [
+  {
+    key: "ton",
     name: "TON Trivia",
-    file: path.join(__dirname, "trivia_ton.js"),
-    description: "Test your knowledge of The Open Network, Toncoin, and Telegram ecosystem!"
+    description: "Test your knowledge of The Open Network, Toncoin, and Telegram ecosystem!",
+    questions: ton
   },
-
-  // Example placeholders for future topics:
-  crypto: {
+  {
+    key: "crypto",
     name: "General Crypto Trivia",
-    file: path.join(__dirname, "trivia_crypto.js"),
-    description: "Bitcoin, Ethereum, DeFi, NFTs and more."
+    description: "Bitcoin, Ethereum, DeFi, NFTs and more.",
+    questions: [] // placeholder, add later
   },
-
-  chilledcat: {
+  {
+    key: "chilledcat",
     name: "Chilled Cat Lore",
-    file: path.join(__dirname, "trivia_cat.js"),
-    description: "Dive into the Chilled Cat universe — stickers, lore, and 90s nostalgia!"
+    description: "Dive into the Chilled Cat universe — stickers, lore, and 90s nostalgia!",
+    questions: [] // placeholder, add later
   }
-};
+];
 
-/**
- * Load questions for the selected topic.
- * Returns [] if topic not found or file missing.
- */
-function loadTopicQuestions(topicKey) {
-  const topic = topics[topicKey];
+function loadTopicQuestions(key) {
+  const topic = topics.find(t => t.key === key);
   if (!topic) return [];
-
-  try {
-    const data = require(topic.file);
-    if (!Array.isArray(data)) throw new Error("Invalid trivia data format");
-    return data;
-  } catch (err) {
-    console.error(`⚠️ Failed to load trivia topic: ${topicKey}`, err);
-    return [];
-  }
+  return topic.questions || [];
 }
 
-/**
- * Return a list of available trivia topics.
- */
 function getAvailableTopics() {
-  return Object.keys(topics).map(key => ({
-    key,
-    name: topics[key].name,
-    description: topics[key].description
-  }));
+  return topics;
 }
 
 module.exports = { loadTopicQuestions, getAvailableTopics };
