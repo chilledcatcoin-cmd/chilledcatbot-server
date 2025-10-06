@@ -1,5 +1,5 @@
 // /modules/Trivia/trivia.js
-// ✅ Telegraf 4.x Compatible Trivia Engine (Per-Player Mode, Stable)
+// ✅ Telegraf 4.x Compatible Trivia Engine (Per-Player Mode, Stable, Patched)
 
 const { activeGames } = require("./state");
 const { shuffleArray, formatQuestion } = require("./utils");
@@ -16,52 +16,55 @@ function setupTrivia(bot) {
   // =====================================================
   //  BUTTON HANDLERS  (A / B / C / D) — must be registered early
   // =====================================================
-bot.on("callback_query", async (ctx, next) => {
-  try {
-    console.log("📬 CALLBACK RECEIVED →", JSON.stringify(ctx.callbackQuery, null, 2));
+  bot.on("callback_query", async (ctx, next) => {
+    try {
+      console.log("📬 CALLBACK RECEIVED →", JSON.stringify(ctx.callbackQuery, null, 2));
 
-    const cbq = ctx.callbackQuery;
-    if (!cbq?.message?.chat?.id) return next();
+      const cbq = ctx.callbackQuery;
+      if (!cbq?.message?.chat?.id) return next();
 
-    const chatId = cbq.message.chat.id;
-    const userId = ctx.from.id;
-    const data = cbq.data;
+      const chatId = cbq.message.chat.id;
+      const userId = ctx.from.id;
+      const data = cbq.data;
 
-    console.log("📟 Parsed:", { chatId, userId, data });
+      console.log("📟 Parsed:", { chatId, userId, data });
 
-    const game = activeGames[chatId];
-    if (!game) {
-      console.log("⚠️ No active game found for chat", chatId);
-      return ctx.answerCbQuery("❌ No trivia game running.");
+      const game = activeGames[chatId];
+      if (!game) {
+        console.log("⚠️ No active game found for chat", chatId);
+        return ctx.answerCbQuery("❌ No trivia game running.");
+      }
+
+      // Only handle A/B/C/D answers
+      if (!/^[ABCD]$/.test(data)) {
+        console.log("🚫 Unknown callback data:", data);
+        return next();
+      }
+
+      const choice = data[0];
+      console.log(`🎯 Player ${ctx.from.username || userId} picked ${choice}`);
+
+      // Prevent duplicate answers
+      if (game.answers[userId]) {
+        console.log(`⛔ ${userId} already answered ${game.answers[userId]}`);
+        return ctx.answerCbQuery("😼 You already answered!");
+      }
+
+      // Record and confirm
+      game.answers[userId] = choice;
+      console.log(`✅ Stored answer:`, game.answers);
+
+      // Feedback popup + public confirmation
+      await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
+      await ctx.reply(`${ctx.from.first_name} picked ${choice}`);
+
+    } catch (err) {
+      console.error("🔥 CALLBACK ERROR:", err);
+      ctx.answerCbQuery("⚠️ Callback handling failed");
     }
+  });
 
-    // test if the data matches A/B/C/D pattern
-    if (!/^[ABCD]/.test(data)) {
-      console.log("🚫 Unknown callback data:", data);
-      return next(); // allow other handlers to process
-    }
-
-    const choice = data[0];
-    console.log(`🎯 Player ${ctx.from.username || userId} picked ${choice}`);
-
-    // Prevent duplicate answers
-    if (game.answers[userId]) {
-      console.log(`⛔ ${userId} already answered ${game.answers[userId]}`);
-      return ctx.answerCbQuery("😼 You already answered!");
-    }
-
-    // Record and confirm
-    game.answers[userId] = choice;
-    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
-    console.log(`✅ Stored answer:`, game.answers);
-
-  } catch (err) {
-    console.error("🔥 CALLBACK ERROR:", err);
-    ctx.answerCbQuery("⚠️ Callback handling failed");
-  }
-});
-
-  // (Optional) If some modules send "ignore" buttons, swallow them safely.
+  // Ignore “ignore” buttons if ever sent
   bot.action("ignore", async (ctx) => ctx.answerCbQuery());
 
   // =====================================================
@@ -106,15 +109,12 @@ bot.on("callback_query", async (ctx, next) => {
 
   // =====================================================
   //  Handle admin topic reply (one-shot per chat)
-  //  IMPORTANT: call `next()` when not handling, or commands like /triviaend break.
   // =====================================================
   bot.on("message", async (replyCtx, next) => {
     const chatId = replyCtx.chat.id;
     const awaiting = bot.context.awaitingTriviaReply?.[chatId];
-    // If no pending selection or not from the initiating admin -> pass through
     if (!awaiting || awaiting !== replyCtx.from.id) return next();
 
-    // Only consume a plain numeric reply as topic index; otherwise pass through
     const text = replyCtx.message?.text?.trim() || "";
     if (!/^\d+$/.test(text)) return next();
 
@@ -124,7 +124,7 @@ bot.on("callback_query", async (ctx, next) => {
     if (isNaN(index) || index < 1 || index > topicsArr.length) {
       await replyCtx.reply("❌ Invalid selection. Try /trivia again.");
       delete bot.context.awaitingTriviaReply[chatId];
-      return; // handled -> do not call next()
+      return;
     }
 
     const topic = topicsArr[index - 1];
@@ -134,16 +134,17 @@ bot.on("callback_query", async (ctx, next) => {
     if (!questions || !questions.length) {
       await replyCtx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
       delete bot.context.awaitingTriviaReply[chatId];
-      return; // handled
+      return;
     }
 
+    // ✅ Clear waiting state once topic selected
     delete bot.context.awaitingTriviaReply[chatId];
+
     await startTrivia(replyCtx, topic.key, replyCtx.from.id);
-    // handled -> do not call next()
   });
 
   // =====================================================
-  //  /triviaskip  &  /triviaend
+  //  /triviaskip & /triviaend
   // =====================================================
   bot.command("triviaskip", (ctx) => {
     const chatId = ctx.chat.id;
@@ -152,6 +153,7 @@ bot.on("callback_query", async (ctx, next) => {
     if (!game) return ctx.reply("No trivia game running here.");
     if (game.adminId !== userId)
       return ctx.reply("Only the admin who started can skip.");
+
     clearTimeout(game.timer);
     ctx.reply("⏭ Skipping question...");
     nextQuestion(ctx);
@@ -230,6 +232,8 @@ function checkAnswers(ctx) {
   const game = activeGames[chatId];
   if (!game) return;
 
+  console.log("🧮 Checking answers:", game.answers);
+
   const q = game.questions[game.currentIndex];
   const correct = ["A", "B", "C", "D"][q.answer];
   const correctText = q.options[q.answer];
@@ -248,6 +252,7 @@ function checkAnswers(ctx) {
     : `😿 No correct answers this round.`;
 
   ctx.reply(msg, { parse_mode: "Markdown" });
+  console.log("✅ Results sent for question", game.currentIndex + 1);
   setTimeout(() => nextQuestion(ctx), BREAK_TIME);
 }
 
