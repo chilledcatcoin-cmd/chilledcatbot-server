@@ -364,30 +364,36 @@ function endBattle(ctx) {
   gameState.active = false;
 
   if (Math.random() < CONFIG.DRAW_CHANCE)
-    return announce(ctx, "😺 The battle ends in a *draw!* All cats nap peacefully. 💤");
+    return ctx.telegram.sendMessage(ctx.chat.id, "😺 The battle ends in a draw! All cats nap peacefully. 💤");
 
-  const winner = gameState.alive.length > 0 ? gameState.alive[0] : null;
+  const winner = gameState.alive[0];
   const frames = ["😺 Spinning the Chill Wheel... ⏳", "🌪️", "💫", "😸"];
   let i = 0;
 
   const spin = setInterval(() => {
-    announce(ctx, frames[i]);
-    i++;
-
-    if (i >= frames.length) {
+    ctx.telegram.sendMessage(ctx.chat.id, frames[i]);
+    if (++i >= frames.length) {
       clearInterval(spin);
+      ctx.telegram.sendMessage(
+        ctx.chat.id,
+        `🏆 ${winner} is crowned the **Chillest Cat Alive™!** 😼`,
+        { parse_mode: "Markdown" }
+      );
+      ctx.telegram.sendMessage(ctx.chat.id, "🎉 The Battle Royale has ended. Thanks for playing!");
 
-      if (winner) {
-        announce(ctx, `🏆 ${winner} is crowned the *Chillest Cat Alive™!* 😼`);
-      } else {
-        announce(ctx, "😿 No cats survived... The fog claims all.");
-      }
-
-      announce(ctx, "🎉 The Battle Royale has ended. Thanks for playing!");
+      // ✅ Reset game state after ending
+      gameState = {
+        active: false,
+        joinOpen: false,
+        alive: [],
+        dead: [],
+        startTime: null,
+        timers: [],
+        rounds: 0,
+      };
     }
   }, 800);
 }
-
 
 /* -----------------------------------------------------
  *  Commands
@@ -406,11 +412,19 @@ function setupBattleRoyale(bot) {
 }
 
 function sendStatus(ctx) {
-  let msg = `📊 *Battle Royale Status*\n\n😼 Alive: *${gameState.alive.length}* | 💀 Dead: *${gameState.dead.length}*\n\n`;
+  if (!gameState.active && gameState.alive.length === 0 && gameState.dead.length === 0) {
+    return ctx.reply("📊 No active battle.\nType /brstart to begin a new one!");
+  }
+
+  let msg = `📊 *Battle Royale Status*\n\n`;
+  msg += `😼 Alive: *${gameState.alive.length}* | 💀 Dead: *${gameState.dead.length}*\n\n`;
+
   if (gameState.alive.length) msg += `🐾 Alive:\n${gameState.alive.join(", ")}\n\n`;
   if (gameState.dead.length) msg += `🪦 Fallen:\n${gameState.dead.join(", ")}\n\n`;
+
   if (duel.active) msg += `⚔️ Duel in progress: ${duel.playerA} vs ${duel.playerB}`;
   else msg += "😺 No duel active right now.";
+
   ctx.reply(msg, { parse_mode: "Markdown" });
 }
 
