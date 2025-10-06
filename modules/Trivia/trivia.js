@@ -6,6 +6,9 @@ const { shuffleArray, formatQuestion } = require("./utils");
 const { loadTopicQuestions, getAvailableTopics } = require("./topics");
 const { setupTroll } = require("./troll");
 
+global.activeTriviaGames = global.activeTriviaGames || {};
+const activeGames = global.activeTriviaGames;
+
 const QUESTIONS_PER_GAME = 10;
 const QUESTION_TIME = 15000; // 15 sec
 const BREAK_TIME = 3000;     // 3 sec
@@ -26,29 +29,28 @@ bot.on("callback_query", async (ctx, next) => {
     const data = cbq.data;
     const game = activeGames[chatId];
 
-    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
+    if (!game) {
+      console.warn(`⚠️ Callback for unknown or expired game in chat ${chatId}`);
+      return ctx.answerCbQuery("❌ No trivia game running.");
+    }
 
-    // Accept "A", "B", "C", "D" and "A_<chatId>"
     const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
     if (!match) return next();
 
     const choice = match[1];
     const cbChatId = match[2] ? Number(match[2]) : chatId;
-
-    // Ignore mismatched chat
     if (cbChatId !== chatId)
       return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
 
-    // Make sure answers object exists even if timer fired early
     if (!game.answers) game.answers = {};
-
-    // Ignore duplicates
     if (game.answers[userId])
       return ctx.answerCbQuery("😼 You already answered!");
 
-    // Record and confirm
     game.answers[userId] = choice;
+    activeGames[chatId] = game; // ✅ Make sure it persists globally
+
     console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
+    console.log(`📥 Active answers so far:`, game.answers);
 
     await ctx.answerCbQuery(`✅ ${choice} locked in`);
   } catch (err) {
