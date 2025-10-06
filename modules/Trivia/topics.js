@@ -1,5 +1,5 @@
 // /modules/Trivia/topics.js
-// Loads JS modules directly instead of JSON files.
+// ✅ Loads .js question modules directly
 
 const ton = require("./trivia_ton");
 
@@ -14,19 +14,23 @@ const topics = [
     key: "crypto",
     name: "General Crypto Trivia",
     description: "Bitcoin, Ethereum, DeFi, NFTs and more.",
-    questions: [] // placeholder, add later
+    questions: [] // placeholder for now
   },
   {
     key: "chilledcat",
     name: "Chilled Cat Lore",
     description: "Dive into the Chilled Cat universe — stickers, lore, and 90s nostalgia!",
-    questions: [] // placeholder, add later
+    questions: [] // placeholder for now
   }
 ];
 
 function loadTopicQuestions(key) {
   const topic = topics.find(t => t.key === key);
-  if (!topic) return [];
+  if (!topic) {
+    console.warn("⚠️ Invalid topic key:", key);
+    return [];
+  }
+  console.log(`🎯 Loading questions for topic: ${topic.name} (${key})`);
   return topic.questions || [];
 }
 
