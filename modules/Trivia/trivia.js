@@ -1,5 +1,5 @@
 // /modules/Trivia/trivia.js
-// ✅ Telegraf-compatible Trivia engine with player counter, button locking, and clean event handling
+// ✅ Telegraf-compatible Trivia engine (stable topic selection + solid button handling)
 
 const { activeGames } = require("./state");
 const { shuffleArray, formatQuestion } = require("./utils");
@@ -7,84 +7,84 @@ const { loadTopicQuestions, getAvailableTopics } = require("./topics");
 const { setupTroll } = require("./troll");
 
 const QUESTIONS_PER_GAME = 10;
-const QUESTION_TIME = 15000; // 15 seconds
-const BREAK_TIME = 3000;     // 3 seconds
+const QUESTION_TIME = 15000; // 15s to answer
+const BREAK_TIME = 3000;     // 3s between questions
 
 function setupTrivia(bot) {
   // ===== /triviatopics =====
   bot.command("triviatopics", async (ctx) => {
     const topics = getAvailableTopics();
-    let message = "📚 *Available Trivia Topics:*\n\n";
+    let msg = "📚 *Available Trivia Topics:*\n\n";
+    topics.forEach((t, i) => {
+      msg += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
+    });
+    msg += "Use /trivia to start a game as an admin.";
+    await ctx.reply(msg, { parse_mode: "Markdown" });
+  });
+
+  // ===== /trivia ===== (admin-only; uses pending state — no dynamic unbinds)
+  bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+
+    // Only admins can start
+    const admins = await ctx.telegram.getChatAdministrators(chatId);
+    const isAdmin = admins.some(a => a.user.id === userId);
+    if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
+
+    // Block if a game already runs
+    if (activeGames[chatId]) {
+      return ctx.reply("A trivia game is already running in this chat!");
+    }
+
+    // Prevent parallel topic prompts
+    if (activeGames[`pending_${chatId}`]) {
+      return ctx.reply("❗ A trivia setup is already waiting for a topic number. Reply with 1, 2, or 3.");
+    }
+
+    const topics = getAvailableTopics();
+    let message = "📘 *Choose a trivia topic:*\n\n";
     topics.forEach((t, i) => {
       message += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
     });
-    message += "Use /trivia to start a game as an admin.";
+    message += "Reply with the topic number to start.";
     await ctx.reply(message, { parse_mode: "Markdown" });
+
+    // Mark pending selection for this chat (who can answer + list of topics)
+    activeGames[`pending_${chatId}`] = { userId, topics, started: Date.now() };
   });
 
-// ===== /trivia =====
-bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
+  // ===== Capture the topic reply (only from the initiating admin) =====
+  bot.on("text", async (ctx, next) => {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const pending = activeGames[`pending_${chatId}`];
+    if (!pending) return next(); // nothing pending in this chat
 
-  // Only admins can start trivia
-  const admins = await ctx.telegram.getChatAdministrators(chatId);
-  const isAdmin = admins.some(a => a.user.id === userId);
-  if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
+    if (pending.userId !== userId) return next(); // only the admin who ran /trivia
 
-  if (activeGames[chatId]) {
-    return ctx.reply("A trivia game is already running in this chat!");
-  }
+    const idx = parseInt((ctx.message.text || "").trim(), 10);
+    if (Number.isNaN(idx) || idx < 1 || idx > pending.topics.length) {
+      await ctx.reply("❌ Invalid selection. Try /trivia again.");
+      delete activeGames[`pending_${chatId}`];
+      return;
+    }
 
-  // Prevent multiple /trivia waiting sessions
-  if (activeGames[`pending_${chatId}`]) {
-    return ctx.reply("❗ A trivia setup is already waiting for a topic number. Please reply with 1, 2, or 3.");
-  }
+    const selected = pending.topics[idx - 1];
+    console.log(`🎯 Trivia topic selected: ${selected.key}`);
 
-  const topics = getAvailableTopics();
-  let message = "📘 *Choose a trivia topic:*\n\n";
-  topics.forEach((t, i) => {
-    message += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
+    const questions = loadTopicQuestions(selected.key);
+    if (!questions || !questions.length) {
+      await ctx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
+      delete activeGames[`pending_${chatId}`];
+      return;
+    }
+
+    delete activeGames[`pending_${chatId}`];
+    await startTrivia(ctx, selected.key, userId);
   });
-  message += "Reply with the topic number to start.";
-  await ctx.reply(message, { parse_mode: "Markdown" });
 
-  // Mark setup state
-  activeGames[`pending_${chatId}`] = { userId, topics, started: Date.now() };
-});
-
-// ===== Capture topic replies =====
-bot.on("text", async (ctx, next) => {
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-  const pending = activeGames[`pending_${chatId}`];
-  if (!pending) return next();
-
-  // Only accept from the admin who initiated /trivia
-  if (pending.userId !== userId) return next();
-
-  const index = parseInt(ctx.message.text.trim());
-  if (isNaN(index) || index < 1 || index > pending.topics.length) {
-    await ctx.reply("❌ Invalid selection. Try /trivia again.");
-    delete activeGames[`pending_${chatId}`];
-    return;
-  }
-
-  const selected = pending.topics[index - 1];
-  console.log(`🎯 Trivia topic selected: ${selected.key}`);
-
-  const questions = loadTopicQuestions(selected.key);
-  if (!questions || !questions.length) {
-    await ctx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
-    delete activeGames[`pending_${chatId}`];
-    return;
-  }
-
-  delete activeGames[`pending_${chatId}`]; // clear pending state
-  await startTrivia(ctx, selected.key, userId);
-});
-
-  // ===== /triviaskip =====
+  // ===== /triviaskip (admin who started) =====
   bot.command("triviaskip", (ctx) => {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
@@ -98,7 +98,7 @@ bot.on("text", async (ctx, next) => {
     nextQuestion(ctx);
   });
 
-  // ===== /triviaend =====
+  // ===== /triviaend (admin who started) =====
   bot.command("triviaend", (ctx) => {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
@@ -110,50 +110,42 @@ bot.on("text", async (ctx, next) => {
     endTrivia(ctx, "Game ended early.");
   });
 
-// ===== Handle button presses =====
-bot.on("callback_query", async (ctx) => {
-  try {
-    const chatId = ctx.callbackQuery.message.chat.id;
-    const userId = ctx.from.id;
-    const choice = ctx.callbackQuery.data;
-    const game = activeGames[chatId];
-    if (!game) return await ctx.answerCbQuery("No active game!");
+  // ===== Answer buttons (Telegraf-native) =====
+  bot.action(/^(A|B|C|D)$/, async (ctx) => {
+    try {
+      const chatId = ctx.callbackQuery.message.chat.id;
+      const game = activeGames[chatId];
+      if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
-    // Prevent duplicate answers
-    if (game.answers[userId]) {
-      return await ctx.answerCbQuery("😼 You already answered!");
+      const userId = ctx.from.id;
+      const choice = ctx.match[0]; // 'A' | 'B' | 'C' | 'D'
+
+      // Block multiple answers per user
+      if (game.answers[userId]) {
+        return ctx.answerCbQuery("😼 You already answered!");
+      }
+
+      // Record and confirm
+      game.answers[userId] = choice;
+      await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
+
+      // (Important) Do NOT edit the message here — allow *everyone* to answer
+      // Users who try again will get the "already answered" toast.
+    } catch (err) {
+      console.error("⚠️ Trivia callback error:", err);
+      ctx.answerCbQuery("⚠️ Error handling your answer");
     }
+  });
 
-    // Record the answer
-    game.answers[userId] = choice;
+  // Optional no-op to swallow any disabled buttons if you ever use them
+  bot.action("ignore", (ctx) => ctx.answerCbQuery());
 
-    // Acknowledge quickly so the spinner stops
-    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
-
-    // Disable all buttons for that user visually
-    const keyboard = {
-      inline_keyboard: [[
-        { text: "A", callback_data: "ignore" },
-        { text: "B", callback_data: "ignore" },
-        { text: "C", callback_data: "ignore" },
-        { text: "D", callback_data: "ignore" }
-      ]]
-    };
-
-    // Update the message to show disabled state (greyed out)
-    await ctx.editMessageReplyMarkup(keyboard);
-  } catch (err) {
-    console.error("⚠️ Callback error:", err);
-    await ctx.answerCbQuery("⚠️ Error handling your answer");
-  }
-});
-
-
+  // ===== /troll =====
   setupTroll(bot);
   console.log("🎲 /troll command linked to Trivia (Telegraf mode)");
 }
 
-// ===== Trivia Flow =====
+/* ========= Trivia Flow ========= */
 
 async function startTrivia(ctx, topicKey, adminId) {
   const chatId = ctx.chat.id;
@@ -165,17 +157,16 @@ async function startTrivia(ctx, topicKey, adminId) {
   }
 
   console.log(`✅ Loaded ${questions.length} questions for topic '${topicKey}'`);
-  const shuffled = shuffleArray(questions).slice(0, QUESTIONS_PER_GAME);
+  const subset = shuffleArray(questions).slice(0, QUESTIONS_PER_GAME);
 
   activeGames[chatId] = {
     topic: topicKey,
-    questions: shuffled,
+    questions: subset,
     currentIndex: -1,
     scores: {},
     answers: {},
     adminId,
-    timer: null,
-    messageLocked: false
+    timer: null
   };
 
   const topicList = getAvailableTopics();
@@ -190,8 +181,7 @@ function nextQuestion(ctx) {
   if (!game) return;
 
   game.currentIndex++;
-  game.answers = {};
-  game.messageLocked = false;
+  game.answers = {}; // reset answer map for this question
 
   if (game.currentIndex >= game.questions.length) {
     return endTrivia(ctx);
@@ -199,6 +189,7 @@ function nextQuestion(ctx) {
 
   const q = game.questions[game.currentIndex];
   const { text } = formatQuestion(q, game.currentIndex + 1);
+
   const keyboard = {
     inline_keyboard: [[
       { text: "A", callback_data: "A" },
@@ -232,7 +223,7 @@ function checkAnswers(ctx) {
   let message = `✅ Correct answer: *${correct}) ${correctText}*\n`;
   message += winners.length
     ? `🏅 ${winners.length} got it right!`
-    : `😿 No correct answers this round.`;
+    : `😺 No correct answers this round.`;
 
   ctx.reply(message, { parse_mode: "Markdown" });
   setTimeout(() => nextQuestion(ctx), BREAK_TIME);
@@ -255,11 +246,12 @@ function endTrivia(ctx, note) {
       text += `${i + 1}. [${r.id}]: ${r.score} points\n`;
     });
 
-    if (results.length > 1 && results[0].score === results[1].score) {
-      const top = results.filter(r => r.score === results[0].score);
-      const names = top.map(r => `[${r.id}]`).join(" and ");
-      text += `\n🤝 It's a tie between ${names}!\nUse /troll to settle it! 🎲`;
-    }
+  // Tie?
+  if (results.length > 1 && results[0].score === results[1].score) {
+    const top = results.filter(r => r.score === results[0].score);
+    const names = top.map(r => `[${r.id}]`).join(" and ");
+    text += `\n🤝 It's a tie between ${names}!\nUse /troll to settle it! 🎲`;
+  }
   }
 
   if (note) text += `\n\n${note}`;
