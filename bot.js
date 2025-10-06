@@ -69,13 +69,17 @@ global.bot = bot; // ✅ make available to trivia/troll modules
 // =====================================================
 //  Debugging (optional, safe to remove later)
 // =====================================================
-bot.on("message", (ctx) => {
-  console.log("📨 MESSAGE RECEIVED:", ctx.message.text);
+// Debug (non-blocking)
+bot.on("message", (ctx, next) => {
+  console.log("📨 MESSAGE RECEIVED:", ctx.message.text || "[non-text]");
+  return next();
 });
 
-bot.on("callback_query", (ctx) => {
-  console.log("📬 GLOBAL CALLBACK RECEIVED:", ctx.callbackQuery.data);
-  ctx.answerCbQuery().catch(() => {});
+bot.on("callback_query", async (ctx, next) => {
+  console.log("📬 GLOBAL CALLBACK RECEIVED:", ctx.callbackQuery?.data);
+  // Optional: don't ack here to avoid double-acks; or keep it but still next()
+  try { await ctx.answerCbQuery().catch(() => {}); } catch {}
+  return next();
 });
 
 // =====================================================
@@ -98,6 +102,14 @@ setupTrivia(bot);
   try {
     console.log("🌐 Ensuring webhook is disabled...");
     await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+
+    console.log("⚙️ Syncing command list...");
+    await bot.telegram.setMyCommands([
+      { command: "trivia", description: "Start a trivia game" },
+      { command: "triviaskip", description: "Skip the current trivia question" },
+      { command: "triviaend", description: "End the trivia game" },
+      { command: "triviatopics", description: "List available trivia topics" },
+    ]);
 
     console.log("🚀 Launching bot in polling mode...");
     await bot.launch({ dropPendingUpdates: true });

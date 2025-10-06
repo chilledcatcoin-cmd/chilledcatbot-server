@@ -27,15 +27,27 @@ function setupTrivia(bot) {
       const game = activeGames[chatId];
 
       if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
-      if (!/^[ABCD]$/.test(data)) return next();
+// Accept "A", "B", "C", "D" and also "A_<chatId>" etc.
+const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
+if (!match) return next();
 
-      // Ignore repeated answers
-      if (game.answers[userId]) {
-        return ctx.answerCbQuery("😼 You already answered!");
-      }
+const choice = match[1];
+const cbChatId = match[2] ? Number(match[2]) : chatId;
 
-      const choice = data[0];
-      game.answers[userId] = choice;
+// Drop stale/out-of-chat button presses (rare, but safe)
+if (cbChatId !== chatId) {
+  return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
+}
+
+// Ignore repeated answers
+if (game.answers[userId]) {
+  return ctx.answerCbQuery("😼 You already answered!");
+}
+
+game.answers[userId] = choice;
+console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
+await ctx.answerCbQuery(`✅ ${choice} locked in`);
+
 
       console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
       await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
