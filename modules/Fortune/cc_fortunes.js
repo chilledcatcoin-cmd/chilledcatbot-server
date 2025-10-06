@@ -1,4 +1,4 @@
-[
+module.exports = [
   "Nine lives, infinite naps. You will vibe with the yarn ball and achieve a new sticker pack.",
   "Liquidity pools filled with milk await your paw. You will ignore the keyboard and achieve eternal chill.",
   "Three breadsticks hold the key to your destiny. You will nap through the keyboard and achieve an unexpected error 404.",
@@ -999,4 +999,4 @@
   "Much wow, very chill. You will ignore the yarn ball and achieve a new sticker pack.",
   "Your dial-up connection predicts incoming chaos. You will nap through the couch cushion and achieve eternal chill.",
   "You will find enlightenment in a can of tuna."
-]
+];
