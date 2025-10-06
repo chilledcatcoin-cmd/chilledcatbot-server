@@ -180,9 +180,6 @@ function setupCommands(bot) {
     ])
     .then(() => console.log("✅ Telegram command list updated."));
 
-  console.log("✅ General commands registered.");
-}
-
 
   /* -------------------------------
      Game Launch via Callback
@@ -211,6 +208,9 @@ function setupCommands(bot) {
       return ctx.telegram.answerGameQuery(q.id, url.toString());
     }
   });
+
+  console.log("✅ General commands registered.");
+
 }
 
 module.exports = { setupCommands };
