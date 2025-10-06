@@ -177,8 +177,8 @@ async function startTrivia(ctx, topicKey, adminId) {
 // =====================================================
 //  NEXT QUESTION (with progress display)
 // =====================================================
-function nextQuestion(ctx) {
-  const chatId = ctx.chat.id;
+function nextQuestion(ctxOrChatId) {
+  const chatId = typeof ctxOrChatId === "object" ? ctxOrChatId.chat.id : ctxOrChatId;
   const game = activeGames[chatId];
   if (!game) return;
 
@@ -186,7 +186,7 @@ function nextQuestion(ctx) {
   game.answers = {};
 
   if (game.currentIndex >= game.questions.length) {
-    return endTrivia(ctx);
+    return endTrivia({ chat: { id: chatId } });
   }
 
   const q = game.questions[game.currentIndex];
@@ -202,17 +202,17 @@ function nextQuestion(ctx) {
     ]],
   };
 
-  ctx.reply(`${progress}\n\n${text}`, {
+  // ✅ Use telegram.sendMessage to avoid stale ctx
+  global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
     reply_markup: keyboard,
     parse_mode: "Markdown",
-  });
+  }).catch(err => console.error("⚠️ sendMessage failed:", err));
 
-  // store current chatId for reference
   game.timer = setTimeout(() => checkAnswers(chatId), QUESTION_TIME);
 }
 
 // =====================================================
-//  CHECK ANSWERS — FIXED to use chatId directly
+//  CHECK ANSWERS — uses chatId directly
 // =====================================================
 function checkAnswers(chatId) {
   const game = activeGames[chatId];
@@ -237,13 +237,11 @@ function checkAnswers(chatId) {
     ? `🏅 ${winners.length} got it right!`
     : `😿 No correct answers this round.`;
 
-  ctxSafeSend(chatId, msg);
-  console.log("✅ Results sent for question", game.currentIndex + 1);
+  global.bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" })
+    .then(() => console.log("✅ Results sent for question", game.currentIndex + 1))
+    .catch(err => console.error("⚠️ Failed to send result:", err));
 
-  setTimeout(() => {
-    const fakeCtx = { chat: { id: chatId } };
-    nextQuestion(fakeCtx);
-  }, BREAK_TIME);
+  setTimeout(() => nextQuestion(chatId), BREAK_TIME);
 }
 
 // =====================================================
