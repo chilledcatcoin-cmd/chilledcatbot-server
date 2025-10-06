@@ -1,5 +1,5 @@
 // /modules/Trivia/trivia.js
-// ✅ Telegraf 4.x Compatible Trivia Engine (Per-Player Mode, Stable, Patched)
+// ✅ Telegraf 4.x Compatible Trivia Engine (Per-Player Mode, Stable, with Progress Display)
 
 const { activeGames } = require("./state");
 const { shuffleArray, formatQuestion } = require("./utils");
@@ -14,61 +14,42 @@ function setupTrivia(bot) {
   console.log("🎮 Initializing Trivia module...");
 
   // =====================================================
-  //  BUTTON HANDLERS  (A / B / C / D) — must be registered early
+  //  BUTTON HANDLERS  (A / B / C / D)
   // =====================================================
   bot.on("callback_query", async (ctx, next) => {
     try {
-      console.log("📬 CALLBACK RECEIVED →", JSON.stringify(ctx.callbackQuery, null, 2));
-
       const cbq = ctx.callbackQuery;
       if (!cbq?.message?.chat?.id) return next();
 
       const chatId = cbq.message.chat.id;
       const userId = ctx.from.id;
       const data = cbq.data;
-
-      console.log("📟 Parsed:", { chatId, userId, data });
-
       const game = activeGames[chatId];
-      if (!game) {
-        console.log("⚠️ No active game found for chat", chatId);
-        return ctx.answerCbQuery("❌ No trivia game running.");
-      }
 
-      // Only handle A/B/C/D answers
-      if (!/^[ABCD]$/.test(data)) {
-        console.log("🚫 Unknown callback data:", data);
-        return next();
-      }
+      if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
+      if (!/^[ABCD]$/.test(data)) return next();
 
-      const choice = data[0];
-      console.log(`🎯 Player ${ctx.from.username || userId} picked ${choice}`);
-
-      // Prevent duplicate answers
+      // Ignore repeated answers
       if (game.answers[userId]) {
-        console.log(`⛔ ${userId} already answered ${game.answers[userId]}`);
         return ctx.answerCbQuery("😼 You already answered!");
       }
 
-      // Record and confirm
+      const choice = data[0];
       game.answers[userId] = choice;
-      console.log(`✅ Stored answer:`, game.answers);
 
-      // Feedback popup + public confirmation
+      console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
       await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
       await ctx.reply(`${ctx.from.first_name} picked ${choice}`);
-
     } catch (err) {
       console.error("🔥 CALLBACK ERROR:", err);
       ctx.answerCbQuery("⚠️ Callback handling failed");
     }
   });
 
-  // Ignore “ignore” buttons if ever sent
   bot.action("ignore", async (ctx) => ctx.answerCbQuery());
 
   // =====================================================
-  //  /triviatopics — list categories
+  //  /triviatopics
   // =====================================================
   bot.command("triviatopics", async (ctx) => {
     const topics = getAvailableTopics();
@@ -81,13 +62,11 @@ function setupTrivia(bot) {
   });
 
   // =====================================================
-  //  /trivia — start game (admin only)
+  //  /trivia — start game
   // =====================================================
   bot.command("trivia", async (ctx) => {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-
-    // only admins can start
     const admins = await ctx.telegram.getChatAdministrators(chatId);
     const isAdmin = admins.some((a) => a.user.id === userId);
     if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
@@ -102,13 +81,12 @@ function setupTrivia(bot) {
     msg += "Reply with the topic number to start.";
     await ctx.reply(msg, { parse_mode: "Markdown" });
 
-    // mark awaiting topic reply
     bot.context.awaitingTriviaReply ??= {};
     bot.context.awaitingTriviaReply[chatId] = userId;
   });
 
   // =====================================================
-  //  Handle admin topic reply (one-shot per chat)
+  //  Handle admin topic reply
   // =====================================================
   bot.on("message", async (replyCtx, next) => {
     const chatId = replyCtx.chat.id;
@@ -121,7 +99,7 @@ function setupTrivia(bot) {
     const index = parseInt(text, 10);
     const topicsArr = getAvailableTopics();
 
-    if (isNaN(index) || index < 1 || index > topicsArr.length) {
+    if (index < 1 || index > topicsArr.length) {
       await replyCtx.reply("❌ Invalid selection. Try /trivia again.");
       delete bot.context.awaitingTriviaReply[chatId];
       return;
@@ -137,9 +115,7 @@ function setupTrivia(bot) {
       return;
     }
 
-    // ✅ Clear waiting state once topic selected
     delete bot.context.awaitingTriviaReply[chatId];
-
     await startTrivia(replyCtx, topic.key, replyCtx.from.id);
   });
 
@@ -153,7 +129,6 @@ function setupTrivia(bot) {
     if (!game) return ctx.reply("No trivia game running here.");
     if (game.adminId !== userId)
       return ctx.reply("Only the admin who started can skip.");
-
     clearTimeout(game.timer);
     ctx.reply("⏭ Skipping question...");
     nextQuestion(ctx);
@@ -169,13 +144,12 @@ function setupTrivia(bot) {
     endTrivia(ctx, "Game ended early.");
   });
 
-  // ===== integrate /troll =====
   setupTroll(bot);
   console.log("🎲 Trivia ready (Per-Player Mode, Telegraf 4.x)");
 }
 
 // =====================================================
-//  GAME FLOW FUNCTIONS
+//  GAME FLOW
 // =====================================================
 async function startTrivia(ctx, topicKey, adminId) {
   const chatId = ctx.chat.id;
@@ -200,6 +174,9 @@ async function startTrivia(ctx, topicKey, adminId) {
   setTimeout(() => nextQuestion(ctx), 3000);
 }
 
+// =====================================================
+//  NEXT QUESTION (with progress display)
+// =====================================================
 function nextQuestion(ctx) {
   const chatId = ctx.chat.id;
   const game = activeGames[chatId];
@@ -208,12 +185,12 @@ function nextQuestion(ctx) {
   game.currentIndex++;
   game.answers = {};
 
-  if (game.currentIndex >= game.questions.length) {
-    return endTrivia(ctx);
-  }
+  if (game.currentIndex >= game.questions.length) return endTrivia(ctx);
 
   const q = game.questions[game.currentIndex];
+  const progress = `🧠 *Question ${game.currentIndex + 1}/${QUESTIONS_PER_GAME}:*`;
   const { text } = formatQuestion(q, game.currentIndex + 1);
+
   const keyboard = {
     inline_keyboard: [[
       { text: "A", callback_data: "A" },
@@ -223,10 +200,17 @@ function nextQuestion(ctx) {
     ]],
   };
 
-  ctx.reply(text, { reply_markup: keyboard, parse_mode: "Markdown" });
+  ctx.reply(`${progress}\n\n${text}`, {
+    reply_markup: keyboard,
+    parse_mode: "Markdown",
+  });
+
   game.timer = setTimeout(() => checkAnswers(ctx), QUESTION_TIME);
 }
 
+// =====================================================
+//  CHECK ANSWERS
+// =====================================================
 function checkAnswers(ctx) {
   const chatId = ctx.chat.id;
   const game = activeGames[chatId];
@@ -256,6 +240,9 @@ function checkAnswers(ctx) {
   setTimeout(() => nextQuestion(ctx), BREAK_TIME);
 }
 
+// =====================================================
+//  END TRIVIA
+// =====================================================
 function endTrivia(ctx, note) {
   const chatId = ctx.chat.id;
   const game = activeGames[chatId];
