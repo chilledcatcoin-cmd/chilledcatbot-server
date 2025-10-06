@@ -178,6 +178,7 @@ bot.telegram.setMyCommands(
 // Set group commands (for all groups)
 bot.telegram.setMyCommands(
   [
+    { command: "br", description: "Battle Royale command list" },
     { command: "brstart", description: "Start a new Battle Royale (admin)" },
     { command: "brcancel", description: "Cancel the current Battle Royale" },
     { command: "brforceend", description: "Force-end and declare a winner" },
