@@ -69,7 +69,7 @@ const { setupLogging } = require("./features/logging");
 const { setupFortune } = require("./modules/Fortune");
 // const { setupChillOrChaos } = require("./modules/CoC");
 const { setupHowChill } = require("./modules/HowChill");
-const { setupBattleRoyale } = require("./modules/battleRoyale");
+const { setupBattleRoyale } = require("./modules/BattleRoyale");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");

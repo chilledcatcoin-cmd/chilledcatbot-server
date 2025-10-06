@@ -1,2 +1,2 @@
-const { setupBatleRoyale } = require("./battleRoyale");
+const { setupBattleRoyale } = require("./battleRoyale");
 module.exports = { setupBattleRoyale };
