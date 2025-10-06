@@ -428,6 +428,7 @@ function sendStatus(ctx) {
   ctx.reply(msg, { parse_mode: "Markdown" });
 }
 
+
 function sendHelp(ctx) {
   ctx.reply(
     "😺 *Chilled Cat Battle Royale Commands*\n\n" +
