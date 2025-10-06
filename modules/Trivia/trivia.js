@@ -1,7 +1,7 @@
 // /modules/Trivia/trivia.js
 // ✅ Telegraf 4.x Compatible Trivia Engine (Per-Player Mode, Stable, with Progress Display)
 
-const { activeGames } = require("./state");
+
 const { shuffleArray, formatQuestion } = require("./utils");
 const { loadTopicQuestions, getAvailableTopics } = require("./topics");
 const { setupTroll } = require("./troll");
