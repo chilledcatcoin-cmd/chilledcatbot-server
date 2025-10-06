@@ -68,7 +68,7 @@ const { setupGroupGuard } = require("./features/groupguard");
 const { setupLogging } = require("./features/logging");
 const { setupFortune } = require("./modules/Fortune/fortune");
 // const { setupChillOrChaos } = require("./modules/CoC");
-const { setupHowChill } = require("./features/howchill");
+const { setupHowChill } = require("./modules/HowChill/howchill");
 const { setupBattleRoyale } = require("./modules/BattleRoyale/battleRoyale");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
