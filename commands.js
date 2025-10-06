@@ -163,24 +163,36 @@ function setupCommands(bot) {
      Telegram Command Menu (for / menu)
      ------------------------------- */
 
-  bot.telegram
-    .setMyCommands([
-      { command: "flappycat", description: "Play Flappy Cat" },
-      { command: "catsweeper", description: "Play CatSweeper" },
-      { command: "brstart", description: "Start a new Battle Royale (admin)" },
-      { command: "brcancel", description: "Cancel the current Battle Royale" },
-      { command: "brforceend", description: "Force-end and declare a winner" },
-      { command: "brjoin", description: "Join the current battle" },
-      { command: "brleave", description: "Leave or forfeit" },
-      { command: "roll", description: "Roll during a duel" },
-      { command: "brstatus", description: "Check current battle status" },
-      { command: "leaderboard", description: "View game leaderboards" },
-      { command: "startcontest", description: "Start a contest (admin)" },
-      { command: "endcontest", description: "End the active contest" },
-      { command: "howchill", description: "How Chill Are You?" },
-      { command: "fortune", description: "Get Your Fortune Told!" },
-    ])
-    .then(() => console.log("✅ Telegram command list updated."));
+// Set global commands (for DMs)
+bot.telegram.setMyCommands(
+  [
+    { command: "flappycat", description: "Play Flappy Cat" },
+    { command: "catsweeper", description: "Play CatSweeper" },
+    { command: "leaderboard", description: "View game leaderboards" },
+    { command: "howchill", description: "How Chill Are You?" },
+    { command: "fortune", description: "Get Your Fortune Told!" }
+  ],
+  { scope: { type: "default" } }
+);
+
+// Set group commands (for all groups)
+bot.telegram.setMyCommands(
+  [
+    { command: "brstart", description: "Start a new Battle Royale (admin)" },
+    { command: "brcancel", description: "Cancel the current Battle Royale" },
+    { command: "brforceend", description: "Force-end and declare a winner" },
+    { command: "brjoin", description: "Join the current battle" },
+    { command: "brleave", description: "Leave or forfeit" },
+    { command: "roll", description: "Roll during a duel" },
+    { command: "brstatus", description: "Check current battle status" },
+    { command: "startcontest", description: "Start a contest (admin)" },
+    { command: "endcontest", description: "End the active contest" },
+    { command: "howchill", description: "How Chill Are You?" },
+    { command: "fortune", description: "Get Your Fortune Told!" }
+  ],
+  { scope: { type: "all_group_chats" } }
+)
+.then(() => console.log("✅ Telegram command lists updated for DMs and groups."));
 
 
   /* -------------------------------
