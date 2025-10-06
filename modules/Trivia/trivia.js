@@ -16,28 +16,48 @@ function setupTrivia(bot) {
   // =====================================================
   //  BUTTON HANDLERS  (A / B / C / D) — must be registered early
   // =====================================================
-bot.action(/^([ABCD])(@\w+)?$/, async (ctx, next) => {
+bot.on("callback_query", async (ctx, next) => {
   try {
+    console.log("📬 CALLBACK RECEIVED →", JSON.stringify(ctx.callbackQuery, null, 2));
+
     const cbq = ctx.callbackQuery;
     if (!cbq?.message?.chat?.id) return next();
+
     const chatId = cbq.message.chat.id;
     const userId = ctx.from.id;
-    const choice = ctx.match[1]; // ✅ Extract A/B/C/D even with @bot suffix
+    const data = cbq.data;
+
+    console.log("📟 Parsed:", { chatId, userId, data });
 
     const game = activeGames[chatId];
-    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
+    if (!game) {
+      console.log("⚠️ No active game found for chat", chatId);
+      return ctx.answerCbQuery("❌ No trivia game running.");
+    }
 
+    // test if the data matches A/B/C/D pattern
+    if (!/^[ABCD]/.test(data)) {
+      console.log("🚫 Unknown callback data:", data);
+      return next(); // allow other handlers to process
+    }
+
+    const choice = data[0];
+    console.log(`🎯 Player ${ctx.from.username || userId} picked ${choice}`);
+
+    // Prevent duplicate answers
     if (game.answers[userId]) {
+      console.log(`⛔ ${userId} already answered ${game.answers[userId]}`);
       return ctx.answerCbQuery("😼 You already answered!");
     }
 
+    // Record and confirm
     game.answers[userId] = choice;
-    console.log(`🎯 ${ctx.from.username || userId} answered ${choice}`);
     await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
+    console.log(`✅ Stored answer:`, game.answers);
 
   } catch (err) {
-    console.error("⚠️ Trivia callback error:", err);
-    ctx.answerCbQuery("⚠️ Error handling answer");
+    console.error("🔥 CALLBACK ERROR:", err);
+    ctx.answerCbQuery("⚠️ Callback handling failed");
   }
 });
 
