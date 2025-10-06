@@ -364,26 +364,30 @@ function endBattle(ctx) {
   gameState.active = false;
 
   if (Math.random() < CONFIG.DRAW_CHANCE)
-    return ctx.reply("😺 The battle ends in a *draw!* All cats nap peacefully. 💤");
+    return announce(ctx, "😺 The battle ends in a *draw!* All cats nap peacefully. 💤");
 
-  // ✅ Check if there are survivors
-  if (!gameState.alive.length) {
-    ctx.reply("💀 All cats have perished. The arena falls silent...");
-    return;
-  }
-
-  const winner = gameState.alive[0];
+  const winner = gameState.alive.length > 0 ? gameState.alive[0] : null;
   const frames = ["😺 Spinning the Chill Wheel... ⏳", "🌪️", "💫", "😸"];
   let i = 0;
+
   const spin = setInterval(() => {
     announce(ctx, frames[i]);
-    if (++i >= frames.length) {
+    i++;
+
+    if (i >= frames.length) {
       clearInterval(spin);
-      ctx.reply(`🏆 ${winner} is crowned the Chillest Cat Alive™! 😼`);
+
+      if (winner) {
+        announce(ctx, `🏆 ${winner} is crowned the *Chillest Cat Alive™!* 😼`);
+      } else {
+        announce(ctx, "😿 No cats survived... The fog claims all.");
+      }
+
       announce(ctx, "🎉 The Battle Royale has ended. Thanks for playing!");
     }
   }, 800);
 }
+
 
 /* -----------------------------------------------------
  *  Commands
