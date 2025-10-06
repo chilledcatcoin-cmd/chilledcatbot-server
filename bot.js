@@ -76,9 +76,17 @@ bot.on("message", (ctx, next) => {
 });
 
 bot.on("callback_query", async (ctx, next) => {
-  console.log("📬 GLOBAL CALLBACK RECEIVED:", ctx.callbackQuery?.data);
-  // Optional: don't ack here to avoid double-acks; or keep it but still next()
-  try { await ctx.answerCbQuery().catch(() => {}); } catch {}
+  const cbq = ctx.callbackQuery;
+  if (!cbq) return next();
+
+  // Ignore game launch callbacks
+  if (cbq.game_short_name) return ctx.answerCbQuery(); // ✅ Silent pass-through
+
+  if (cbq.data) {
+    console.log("📬 GLOBAL CALLBACK RECEIVED:", cbq.data);
+    await ctx.answerCbQuery("✅ Received!");
+  }
+
   return next();
 });
 
