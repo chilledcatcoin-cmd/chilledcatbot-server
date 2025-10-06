@@ -185,7 +185,9 @@ function nextQuestion(ctx) {
   game.currentIndex++;
   game.answers = {};
 
-  if (game.currentIndex >= game.questions.length) return endTrivia(ctx);
+  if (game.currentIndex >= game.questions.length) {
+    return endTrivia(ctx);
+  }
 
   const q = game.questions[game.currentIndex];
   const progress = `🧠 *Question ${game.currentIndex + 1}/${QUESTIONS_PER_GAME}:*`;
@@ -193,10 +195,10 @@ function nextQuestion(ctx) {
 
   const keyboard = {
     inline_keyboard: [[
-      { text: "A", callback_data: "A" },
-      { text: "B", callback_data: "B" },
-      { text: "C", callback_data: "C" },
-      { text: "D", callback_data: "D" },
+      { text: "A", callback_data: `A_${chatId}` },
+      { text: "B", callback_data: `B_${chatId}` },
+      { text: "C", callback_data: `C_${chatId}` },
+      { text: "D", callback_data: `D_${chatId}` },
     ]],
   };
 
@@ -205,14 +207,14 @@ function nextQuestion(ctx) {
     parse_mode: "Markdown",
   });
 
-  game.timer = setTimeout(() => checkAnswers(ctx), QUESTION_TIME);
+  // store current chatId for reference
+  game.timer = setTimeout(() => checkAnswers(chatId), QUESTION_TIME);
 }
 
 // =====================================================
-//  CHECK ANSWERS
+//  CHECK ANSWERS — FIXED to use chatId directly
 // =====================================================
-function checkAnswers(ctx) {
-  const chatId = ctx.chat.id;
+function checkAnswers(chatId) {
   const game = activeGames[chatId];
   if (!game) return;
 
@@ -235,9 +237,26 @@ function checkAnswers(ctx) {
     ? `🏅 ${winners.length} got it right!`
     : `😿 No correct answers this round.`;
 
-  ctx.reply(msg, { parse_mode: "Markdown" });
+  ctxSafeSend(chatId, msg);
   console.log("✅ Results sent for question", game.currentIndex + 1);
-  setTimeout(() => nextQuestion(ctx), BREAK_TIME);
+
+  setTimeout(() => {
+    const fakeCtx = { chat: { id: chatId } };
+    nextQuestion(fakeCtx);
+  }, BREAK_TIME);
+}
+
+// =====================================================
+//  SAFE MESSAGE SENDER (for when ctx is lost)
+// =====================================================
+async function ctxSafeSend(chatId, text) {
+  try {
+    const game = activeGames[chatId];
+    if (!game || !global.bot) return;
+    await global.bot.telegram.sendMessage(chatId, text, { parse_mode: "Markdown" });
+  } catch (err) {
+    console.error("⚠️ ctxSafeSend failed:", err);
+  }
 }
 
 // =====================================================
