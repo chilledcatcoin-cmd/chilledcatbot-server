@@ -1,5 +1,6 @@
 // /modules/Trivia/trivia.js
-// Telegraf version (replaces bot.onText with bot.command)
+// ✅ Fully Telegraf-compatible Trivia engine
+// Handles /trivia flow correctly without .once()
 
 const { activeGames } = require("./state");
 const { shuffleArray, formatQuestion } = require("./utils");
@@ -25,7 +26,7 @@ function setupTrivia(bot) {
   });
 
   // ===== Command: /trivia =====
-  bot.command("trivia", async (ctx) => {
+  bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
 
@@ -48,16 +49,25 @@ function setupTrivia(bot) {
 
     await ctx.reply(message, { parse_mode: "Markdown" });
 
-    bot.once("message", async (replyCtx) => {
+    // === Wait for admin reply ===
+    const handler = async (replyCtx) => {
+      // Ignore if wrong chat or user
       if (replyCtx.chat.id !== chatId || replyCtx.from.id !== userId) return;
-      const index = parseInt(replyCtx.message.text?.trim());
+
+      const text = replyCtx.message?.text?.trim();
+      const index = parseInt(text);
       if (isNaN(index) || index < 1 || index > topics.length) {
-        return ctx.reply("❌ Invalid selection. Try /trivia again.");
+        await ctx.reply("❌ Invalid selection. Try /trivia again.");
+        bot.off("message", handler);
+        return;
       }
 
       const topicKey = Object.keys(getAvailableTopics())[index - 1];
-      startTrivia(ctx, topicKey, userId);
-    });
+      await startTrivia(replyCtx, topicKey, userId);
+      bot.off("message", handler); // stop listening after one valid reply
+    };
+
+    bot.on("message", handler);
   });
 
   // ===== Command: /triviaskip =====
@@ -110,10 +120,12 @@ function setupTrivia(bot) {
   console.log("🎲 /troll command linked to Trivia (Telegraf mode)");
 }
 
+// ===== Game Logic =====
+
 async function startTrivia(ctx, topicKey, adminId) {
   const chatId = ctx.chat.id;
   const questions = loadTopicQuestions(topicKey);
-  if (!questions.length) {
+  if (!questions || !questions.length) {
     return ctx.reply("⚠️ Failed to load questions for this topic.");
   }
 
@@ -208,7 +220,6 @@ function endTrivia(ctx, note) {
       text += `${i + 1}. [${r.id}]: ${r.score} points\n`;
     });
 
-    // Detect ties
     if (results.length > 1 && results[0].score === results[1].score) {
       const top = results.filter(r => r.score === results[0].score);
       const names = top.map(r => `[${r.id}]`).join(" and ");
