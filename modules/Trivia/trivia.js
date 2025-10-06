@@ -27,30 +27,24 @@ bot.on("callback_query", async (ctx, next) => {
     const chatId = cbq.message.chat.id;
     const userId = ctx.from.id;
     const data = cbq.data;
-    const game = activeGames[chatId];
-
-    if (!game) {
-      console.warn(`⚠️ Callback for unknown or expired game in chat ${chatId}`);
-      return ctx.answerCbQuery("❌ No trivia game running.");
-    }
-
     const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
     if (!match) return next();
 
     const choice = match[1];
     const cbChatId = match[2] ? Number(match[2]) : chatId;
-    if (cbChatId !== chatId)
-      return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
+    if (cbChatId !== chatId) return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
+
+    const game = activeGames[chatId];
+    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
     if (!game.answers) game.answers = {};
-    if (game.answers[userId])
-      return ctx.answerCbQuery("😼 You already answered!");
+    if (game.answers[userId]) return ctx.answerCbQuery("😼 You already answered!");
 
+    // ✅ Save answer safely and persist immediately
     game.answers[userId] = choice;
-    activeGames[chatId] = game; // ✅ Make sure it persists globally
-
-    console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
-    console.log(`📥 Active answers so far:`, game.answers);
+    activeGames[chatId] = { ...game }; // force re-store (not by reference)
+    console.log(`🎯 ${ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
+    console.log(`📥 Answers snapshot now:`, activeGames[chatId].answers);
 
     await ctx.answerCbQuery(`✅ ${choice} locked in`);
   } catch (err) {
@@ -58,6 +52,7 @@ bot.on("callback_query", async (ctx, next) => {
     try { await ctx.answerCbQuery("⚠️ Callback handling failed"); } catch {}
   }
 });
+
 
 
   bot.action("ignore", async (ctx) => ctx.answerCbQuery());
@@ -239,9 +234,9 @@ function nextQuestion(ctxOrChatId) {
 
 game.timer = setTimeout(() => {
   console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
-  setTimeout(() => {
-    checkAnswers(chatId);
-  }, 3500); // 3.5s grace period for late callbacks
+setTimeout(() => {
+  console.log(`🕒 Time's up for question ${game.currentIndex + 1} — waiting for late answers...`);
+  setTimeout(() => checkAnswers(chatId), 4000); // 4s grace
 }, QUESTION_TIME);
 
 }
@@ -250,7 +245,8 @@ game.timer = setTimeout(() => {
 //  CHECK ANSWERS — uses chatId directly
 // =====================================================
 function checkAnswers(chatId) {
-  const game = activeGames[chatId];
+const game = { ...activeGames[chatId] }; // clone current snapshot to avoid stale ref
+
   if (!game) return;
 
   console.log("🧮 Checking answers:", game.answers);
