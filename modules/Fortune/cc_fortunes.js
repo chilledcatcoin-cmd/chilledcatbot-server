@@ -1,3 +1,11 @@
+/**
+ * =====================================================
+ *  Chilled Cat Fortunes Library
+ *  Contains all randomized fortune strings
+ *  Add or remove entries freely — no commas after last item
+ * =====================================================
+ */
+
 module.exports = [
   "Nine lives, infinite naps. You will vibe with the yarn ball and achieve a new sticker pack.",
   "Liquidity pools filled with milk await your paw. You will ignore the keyboard and achieve eternal chill.",

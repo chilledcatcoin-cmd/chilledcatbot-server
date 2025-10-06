@@ -1,26 +1,28 @@
-// /modules/Fortune/fortune.js
-const fs = require("fs");
-const path = require("path");
+/**
+ * =====================================================
+ *  Chilled Cat Fortune Module
+ *  Author: Derek Sheppard
+ *  Purpose: Adds /fortune command to ChilledCatBot
+ *  Notes:
+ *    - Loads random fortune from cc_fortunes.js
+ *    - Uses a chill 90s-style flair for replies
+ * =====================================================
+ */
 
-let fortunes = [];
-
-// Determine absolute path to JSON file
-const FORTUNE_PATH = path.join(__dirname, "chilled_cat_fortunes.json");
-
-// Load fortunes at startup
-try {
-  const data = fs.readFileSync(FORTUNE_PATH, "utf-8");
-  fortunes = JSON.parse(data);
-  console.log(`✅ Loaded ${fortunes.length} fortunes from chilled_cat_fortunes.json`);
-} catch (err) {
-  console.error("❌ Could not load chilled_cat_fortunes.json", err);
-  fortunes = ["😿 The yarn ball of destiny is tangled. No fortune today."];
-}
+const fortunes = require("./cc_fortunes");
 
 function setupFortune(bot) {
   bot.command("fortune", (ctx) => {
+    if (!fortunes || fortunes.length === 0) {
+      ctx.reply("😿 The yarn ball of destiny is tangled. No fortune today.");
+      return;
+    }
+
     const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
-    ctx.reply(`🔮 The Chilled Cat peers into the yarn ball of destiny...\n\n${fortune}`);
+
+    ctx.reply(
+      `🔮 The Chilled Cat peers into the yarn ball of destiny...\n\n${fortune}`
+    );
   });
 }
 
