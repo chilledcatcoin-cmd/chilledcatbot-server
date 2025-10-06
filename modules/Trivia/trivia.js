@@ -27,34 +27,29 @@ function setupTrivia(bot) {
       const game = activeGames[chatId];
 
       if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
-// Accept "A", "B", "C", "D" and also "A_<chatId>" etc.
-const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
-if (!match) return next();
 
-const choice = match[1];
-const cbChatId = match[2] ? Number(match[2]) : chatId;
+      // Accept "A", "B", "C", "D" and "A_<chatId>"
+      const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
+      if (!match) return next();
 
-// Drop stale/out-of-chat button presses (rare, but safe)
-if (cbChatId !== chatId) {
-  return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
-}
+      const choice = match[1];
+      const cbChatId = match[2] ? Number(match[2]) : chatId;
 
-// Ignore repeated answers
-if (game.answers[userId]) {
-  return ctx.answerCbQuery("😼 You already answered!");
-}
+      // Ignore mismatched chat
+      if (cbChatId !== chatId)
+        return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
 
-game.answers[userId] = choice;
-console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
-await ctx.answerCbQuery(`✅ ${choice} locked in`);
+      // Ignore duplicates
+      if (game.answers[userId])
+        return ctx.answerCbQuery("😼 You already answered!");
 
-
+      // Record and confirm
+      game.answers[userId] = choice;
       console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
-      await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
-      await ctx.reply(`${ctx.from.first_name} picked ${choice}`);
+      await ctx.answerCbQuery(`✅ ${choice} locked in`);
     } catch (err) {
       console.error("🔥 CALLBACK ERROR:", err);
-      ctx.answerCbQuery("⚠️ Callback handling failed");
+      try { await ctx.answerCbQuery("⚠️ Callback handling failed"); } catch {}
     }
   });
 
@@ -88,28 +83,6 @@ await ctx.answerCbQuery(`✅ ${choice} locked in`);
     console.log("🔥 /trivia triggered via command()");
     await handleTriviaStart(ctx, bot);
   });
-
-async function handleTriviaStart(ctx, bot) {
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-  const admins = await ctx.telegram.getChatAdministrators(chatId);
-  const isAdmin = admins.some((a) => a.user.id === userId);
-  if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
-
-  if (activeGames[chatId]) return ctx.reply("A trivia game is already running here!");
-
-  const topics = getAvailableTopics();
-  let msg = "📘 *Choose a trivia topic:*\n\n";
-  topics.forEach((t, i) => {
-    msg += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
-  });
-  msg += "Reply with the topic number to start.";
-  await ctx.reply(msg, { parse_mode: "Markdown" });
-
-  bot.context.awaitingTriviaReply ??= {};
-  bot.context.awaitingTriviaReply[chatId] = userId;
-}
-
 
   // =====================================================
   //  Handle admin topic reply
@@ -175,6 +148,30 @@ async function handleTriviaStart(ctx, bot) {
 }
 
 // =====================================================
+//  START GAME HANDLER
+// =====================================================
+async function handleTriviaStart(ctx, bot) {
+  const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  const admins = await ctx.telegram.getChatAdministrators(chatId);
+  const isAdmin = admins.some((a) => a.user.id === userId);
+  if (!isAdmin) return ctx.reply("😼 Only group admins can start trivia.");
+
+  if (activeGames[chatId]) return ctx.reply("A trivia game is already running here!");
+
+  const topics = getAvailableTopics();
+  let msg = "📘 *Choose a trivia topic:*\n\n";
+  topics.forEach((t, i) => {
+    msg += `${i + 1}. ${t.name}\n   _${t.description}_\n\n`;
+  });
+  msg += "Reply with the topic number to start.";
+  await ctx.reply(msg, { parse_mode: "Markdown" });
+
+  bot.context.awaitingTriviaReply ??= {};
+  bot.context.awaitingTriviaReply[chatId] = userId;
+}
+
+// =====================================================
 //  GAME FLOW
 // =====================================================
 async function startTrivia(ctx, topicKey, adminId) {
@@ -228,7 +225,6 @@ function nextQuestion(ctxOrChatId) {
     ]],
   };
 
-  // ✅ Use telegram.sendMessage to avoid stale ctx
   global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
     reply_markup: keyboard,
     parse_mode: "Markdown",
@@ -268,19 +264,6 @@ function checkAnswers(chatId) {
     .catch(err => console.error("⚠️ Failed to send result:", err));
 
   setTimeout(() => nextQuestion(chatId), BREAK_TIME);
-}
-
-// =====================================================
-//  SAFE MESSAGE SENDER (for when ctx is lost)
-// =====================================================
-async function ctxSafeSend(chatId, text) {
-  try {
-    const game = activeGames[chatId];
-    if (!game || !global.bot) return;
-    await global.bot.telegram.sendMessage(chatId, text, { parse_mode: "Markdown" });
-  } catch (err) {
-    console.error("⚠️ ctxSafeSend failed:", err);
-  }
 }
 
 // =====================================================
