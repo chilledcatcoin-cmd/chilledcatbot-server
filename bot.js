@@ -94,6 +94,17 @@ setupTrivia(bot);
     console.log("🌐 Clearing existing webhooks...");
     await bot.telegram.deleteWebhook({ drop_pending_updates: true });
 
+    // 🔍 DEBUG: Check if bot receives messages
+    bot.on("message", (ctx) => {
+      console.log("📨 MESSAGE RECEIVED:", ctx.message.text);
+    });
+
+    // 🔍 DEBUG: Check if bot receives callback queries (button presses)
+    bot.on("callback_query", (ctx) => {
+      console.log("📬 GLOBAL CALLBACK:", ctx.callbackQuery.data);
+      ctx.answerCbQuery("Callback captured!");
+    });
+
     console.log("🚀 Launching bot in polling mode...");
     await bot.launch();
 
@@ -102,7 +113,6 @@ setupTrivia(bot);
     console.error("❌ Bot launch failed:", err);
   }
 })();
-
 // ✅ Graceful Shutdown
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
