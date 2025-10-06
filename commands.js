@@ -177,6 +177,8 @@ function setupCommands(bot) {
       { command: "leaderboard", description: "View game leaderboards" },
       { command: "startcontest", description: "Start a contest (admin)" },
       { command: "endcontest", description: "End the active contest" },
+      { command: "howchill", description: "How Chill Are You?" },
+      { command: "fortune", description: "Get Your Fortune Told!" },
     ])
     .then(() => console.log("✅ Telegram command list updated."));
 
