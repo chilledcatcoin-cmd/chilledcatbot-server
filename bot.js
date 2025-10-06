@@ -77,6 +77,11 @@ if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
 const bot = new Telegraf(BOT_TOKEN);
 
+bot.on("callback_query", (ctx) => {
+  console.log("📬 GLOBAL CALLBACK RECEIVED:", ctx.callbackQuery.data);
+  ctx.answerCbQuery("✅ Received!");
+});
+
 // ✅ Load Features
 setupCommands(bot);
 setupContests(bot);
