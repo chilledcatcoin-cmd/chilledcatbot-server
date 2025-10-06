@@ -113,41 +113,41 @@ bot.on("text", async (ctx, next) => {
 // ===== Handle button presses =====
 bot.on("callback_query", async (ctx) => {
   try {
-    const chatId = ctx.chat.id;
-    const game = activeGames[chatId];
-    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
-
+    const chatId = ctx.callbackQuery.message.chat.id;
     const userId = ctx.from.id;
-    const choice = ctx.callbackQuery.data; // <-- proper Telegraf property
+    const choice = ctx.callbackQuery.data;
+    const game = activeGames[chatId];
+    if (!game) return await ctx.answerCbQuery("No active game!");
 
-    // Prevent multiple answers
+    // Prevent duplicate answers
     if (game.answers[userId]) {
-      return ctx.answerCbQuery("😼 You already answered this question!");
+      return await ctx.answerCbQuery("😼 You already answered!");
     }
 
-    // Record player’s answer
+    // Record the answer
     game.answers[userId] = choice;
 
-    // Confirm response
-    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`, { show_alert: false });
+    // Acknowledge quickly so the spinner stops
+    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
 
-    // Disable buttons after they answer (optional but good UX)
-    const messageId = ctx.callbackQuery.message.message_id;
-    const updatedKeyboard = {
+    // Disable all buttons for that user visually
+    const keyboard = {
       inline_keyboard: [[
-        { text: choice === "A" ? "🟢 A" : "A", callback_data: "A" },
-        { text: choice === "B" ? "🟢 B" : "B", callback_data: "B" },
-        { text: choice === "C" ? "🟢 C" : "C", callback_data: "C" },
-        { text: choice === "D" ? "🟢 D" : "D", callback_data: "D" }
+        { text: "A", callback_data: "ignore" },
+        { text: "B", callback_data: "ignore" },
+        { text: "C", callback_data: "ignore" },
+        { text: "D", callback_data: "ignore" }
       ]]
     };
 
-    // Edit the same message to show the locked-in buttons
-    await ctx.telegram.editMessageReplyMarkup(chatId, messageId, null, updatedKeyboard);
+    // Update the message to show disabled state (greyed out)
+    await ctx.editMessageReplyMarkup(keyboard);
   } catch (err) {
-    console.error("⚠️ Trivia callback error:", err);
+    console.error("⚠️ Callback error:", err);
+    await ctx.answerCbQuery("⚠️ Error handling your answer");
   }
 });
+
 
   setupTroll(bot);
   console.log("🎲 /troll command linked to Trivia (Telegraf mode)");
