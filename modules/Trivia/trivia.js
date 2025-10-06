@@ -110,56 +110,44 @@ bot.on("text", async (ctx, next) => {
     endTrivia(ctx, "Game ended early.");
   });
 
-  // ===== Handle button presses =====
-  bot.on("callback_query", async (ctx) => {
-    try {
-      const chatId = ctx.callbackQuery.message.chat.id;
-      const game = activeGames[chatId];
-      if (!game) return ctx.answerCbQuery("No active trivia game.");
+// ===== Handle button presses =====
+bot.on("callback_query", async (ctx) => {
+  try {
+    const chatId = ctx.chat.id;
+    const game = activeGames[chatId];
+    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
-      const userId = ctx.from.id;
-      const choice = ctx.callbackQuery.data;
+    const userId = ctx.from.id;
+    const choice = ctx.callbackQuery.data; // <-- proper Telegraf property
 
-      if (choice === "ignore") return ctx.answerCbQuery();
-
-      if (game.answers[userId]) {
-        return ctx.answerCbQuery("😺 You already answered!");
-      }
-
-      // Record answer
-      game.answers[userId] = choice;
-      await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
-
-      // Update question with player count
-      const q = game.questions[game.currentIndex];
-      const { text } = formatQuestion(q, game.currentIndex + 1);
-      const answeredCount = Object.keys(game.answers).length;
-
-      const lockedKeyboard = {
-        inline_keyboard: [[
-          { text: choice === "A" ? "✅ A" : "A", callback_data: "ignore" },
-          { text: choice === "B" ? "✅ B" : "B", callback_data: "ignore" },
-          { text: choice === "C" ? "✅ C" : "C", callback_data: "ignore" },
-          { text: choice === "D" ? "✅ D" : "D", callback_data: "ignore" }
-        ]]
-      };
-
-      // Only first responder triggers lock edit
-      if (!game.messageLocked) {
-        game.messageLocked = true;
-        await ctx.editMessageText(
-          `${text}\n\n🕓 ${answeredCount} player${answeredCount === 1 ? "" : "s"} answered...`,
-          { reply_markup: lockedKeyboard, parse_mode: "Markdown" }
-        );
-      } else {
-        // Just update count silently
-        await ctx.editMessageReplyMarkup(lockedKeyboard);
-      }
-    } catch (err) {
-      console.error("⚠️ Trivia callback error:", err);
-      ctx.answerCbQuery("⚠️ Something went wrong.");
+    // Prevent multiple answers
+    if (game.answers[userId]) {
+      return ctx.answerCbQuery("😼 You already answered this question!");
     }
-  });
+
+    // Record player’s answer
+    game.answers[userId] = choice;
+
+    // Confirm response
+    await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`, { show_alert: false });
+
+    // Disable buttons after they answer (optional but good UX)
+    const messageId = ctx.callbackQuery.message.message_id;
+    const updatedKeyboard = {
+      inline_keyboard: [[
+        { text: choice === "A" ? "🟢 A" : "A", callback_data: "A" },
+        { text: choice === "B" ? "🟢 B" : "B", callback_data: "B" },
+        { text: choice === "C" ? "🟢 C" : "C", callback_data: "C" },
+        { text: choice === "D" ? "🟢 D" : "D", callback_data: "D" }
+      ]]
+    };
+
+    // Edit the same message to show the locked-in buttons
+    await ctx.telegram.editMessageReplyMarkup(chatId, messageId, null, updatedKeyboard);
+  } catch (err) {
+    console.error("⚠️ Trivia callback error:", err);
+  }
+});
 
   setupTroll(bot);
   console.log("🎲 /troll command linked to Trivia (Telegraf mode)");
