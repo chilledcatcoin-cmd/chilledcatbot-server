@@ -14,13 +14,16 @@ function setupTrivia(bot) {
   console.log("🎮 Initializing Trivia module...");
 
   // =====================================================
-  //  BUTTON HANDLERS  (A / B / C / D)
+  //  BUTTON HANDLERS  (A / B / C / D) — must be registered early
   // =====================================================
-  bot.action(/^[ABCD]$/, async (ctx) => {
+  bot.action(/^[ABCD]$/, async (ctx, next) => {
     try {
-      const chatId = ctx.callbackQuery.message.chat.id;
+      const cbq = ctx.callbackQuery;
+      if (!cbq?.message?.chat?.id) return next();
+      const chatId = cbq.message.chat.id;
       const userId = ctx.from.id;
-      const choice = ctx.callbackQuery.data;
+      const choice = cbq.data;
+
       const game = activeGames[chatId];
       if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
@@ -34,24 +37,20 @@ function setupTrivia(bot) {
       console.log(`🎯 ${ctx.from.username || userId} answered ${choice}`);
       await ctx.answerCbQuery(`✅ Answer recorded: ${choice}`);
 
-      // visually disable buttons for that user
-      try {
-        await ctx.editMessageReplyMarkup({
-          inline_keyboard: [[{ text: `✅ ${choice}`, callback_data: "ignore" }]],
-        });
-      } catch (e) {
-        // harmless if already edited by another user
-      }
+      // Per-player mode: do NOT edit the message markup (it would affect everyone)
+      // We rely on the stored answer to reject further taps from this user.
+      return;
     } catch (err) {
       console.error("⚠️ Trivia callback error:", err);
-      ctx.answerCbQuery("⚠️ Error handling answer");
+      return ctx.answerCbQuery("⚠️ Error handling answer");
     }
   });
 
-  bot.action("ignore", async (ctx) => ctx.answerCbQuery("😺 You already answered!"));
+  // (Optional) If some modules send "ignore" buttons, swallow them safely.
+  bot.action("ignore", async (ctx) => ctx.answerCbQuery());
 
   // =====================================================
-  //  /triviatopics — list available categories
+  //  /triviatopics — list categories
   // =====================================================
   bot.command("triviatopics", async (ctx) => {
     const topics = getAvailableTopics();
@@ -92,20 +91,25 @@ function setupTrivia(bot) {
 
   // =====================================================
   //  Handle admin topic reply (one-shot per chat)
+  //  IMPORTANT: call `next()` when not handling, or commands like /triviaend break.
   // =====================================================
-  bot.on("message", async (replyCtx) => {
+  bot.on("message", async (replyCtx, next) => {
     const chatId = replyCtx.chat.id;
     const awaiting = bot.context.awaitingTriviaReply?.[chatId];
-    if (!awaiting || awaiting !== replyCtx.from.id) return; // ignore others
+    // If no pending selection or not from the initiating admin -> pass through
+    if (!awaiting || awaiting !== replyCtx.from.id) return next();
 
-    const text = replyCtx.message?.text?.trim();
-    const index = parseInt(text);
+    // Only consume a plain numeric reply as topic index; otherwise pass through
+    const text = replyCtx.message?.text?.trim() || "";
+    if (!/^\d+$/.test(text)) return next();
+
+    const index = parseInt(text, 10);
     const topicsArr = getAvailableTopics();
 
     if (isNaN(index) || index < 1 || index > topicsArr.length) {
       await replyCtx.reply("❌ Invalid selection. Try /trivia again.");
       delete bot.context.awaitingTriviaReply[chatId];
-      return;
+      return; // handled -> do not call next()
     }
 
     const topic = topicsArr[index - 1];
@@ -115,11 +119,12 @@ function setupTrivia(bot) {
     if (!questions || !questions.length) {
       await replyCtx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
       delete bot.context.awaitingTriviaReply[chatId];
-      return;
+      return; // handled
     }
 
     delete bot.context.awaitingTriviaReply[chatId];
     await startTrivia(replyCtx, topic.key, replyCtx.from.id);
+    // handled -> do not call next()
   });
 
   // =====================================================

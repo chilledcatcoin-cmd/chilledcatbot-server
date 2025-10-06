@@ -111,7 +111,19 @@ function setupLogging(bot) {
         log(`🚪 ${member.username ? "@" + member.username : member.id} in ${ctx.chat.title}`);
       }
     }
+    return next();
   });
+
+// Log callback queries (buttons) and pass through
+bot.on("callback_query", (ctx, next) => {
+  if (logFlags.messages && shouldLogChat(ctx.chat?.id)) {
+    const user = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.id;
+    const data = ctx.callbackQuery?.data || "[no data]";
+    const chat = ctx.chat?.title || ctx.chat?.id;
+    log(`🔘 ${user} pressed button "${data}" in ${chat}`);
+  }
+  return next(); // <-- CRITICAL: allows other modules (like Trivia) to see it
+});
 
   // Error handler
   bot.catch((err, ctx) => {
