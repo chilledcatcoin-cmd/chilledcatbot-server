@@ -36,7 +36,11 @@ bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
     return ctx.reply("A trivia game is already running in this chat!");
   }
 
-  // Show topics
+  // Prevent multiple /trivia waiting sessions
+  if (activeGames[`pending_${chatId}`]) {
+    return ctx.reply("❗ A trivia setup is already waiting for a topic number. Please reply with 1, 2, or 3.");
+  }
+
   const topics = getAvailableTopics();
   let message = "📘 *Choose a trivia topic:*\n\n";
   topics.forEach((t, i) => {
@@ -45,38 +49,39 @@ bot.hears(/^\/trivia(@\w+)?$/, async (ctx) => {
   message += "Reply with the topic number to start.";
   await ctx.reply(message, { parse_mode: "Markdown" });
 
-  // One-time listener for admin reply
-  const onMessage = async (replyCtx) => {
-    try {
-      if (replyCtx.chat.id !== chatId || replyCtx.from.id !== userId) return;
+  // Mark setup state
+  activeGames[`pending_${chatId}`] = { userId, topics, started: Date.now() };
+});
 
-      const text = replyCtx.message?.text?.trim();
-      const index = parseInt(text);
-      if (isNaN(index) || index < 1 || index > topics.length) {
-        await replyCtx.reply("❌ Invalid selection. Try /trivia again.");
-        bot.removeListener("message", onMessage);
-        return;
-      }
+// ===== Capture topic replies =====
+bot.on("text", async (ctx, next) => {
+  const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  const pending = activeGames[`pending_${chatId}`];
+  if (!pending) return next();
 
-      const selected = topics[index - 1];
-      console.log(`🎯 Trivia topic selected: ${selected.key}`);
+  // Only accept from the admin who initiated /trivia
+  if (pending.userId !== userId) return next();
 
-      const questions = loadTopicQuestions(selected.key);
-      if (!questions || !questions.length) {
-        await replyCtx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
-        delete activeGames[chatId];
-        bot.removeListener("message", onMessage);
-        return;
-      }
+  const index = parseInt(ctx.message.text.trim());
+  if (isNaN(index) || index < 1 || index > pending.topics.length) {
+    await ctx.reply("❌ Invalid selection. Try /trivia again.");
+    delete activeGames[`pending_${chatId}`];
+    return;
+  }
 
-      await startTrivia(replyCtx, selected.key, userId);
-    } finally {
-      // Always clean up
-      bot.removeListener("message", onMessage);
-    }
-  };
+  const selected = pending.topics[index - 1];
+  console.log(`🎯 Trivia topic selected: ${selected.key}`);
 
-  bot.on("message", onMessage);
+  const questions = loadTopicQuestions(selected.key);
+  if (!questions || !questions.length) {
+    await ctx.reply("⚠️ Failed to load questions for this topic. Cancelling game.");
+    delete activeGames[`pending_${chatId}`];
+    return;
+  }
+
+  delete activeGames[`pending_${chatId}`]; // clear pending state
+  await startTrivia(ctx, selected.key, userId);
 });
 
   // ===== /triviaskip =====
