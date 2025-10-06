@@ -13,45 +13,50 @@ const BREAK_TIME = 3000;     // 3 sec
 function setupTrivia(bot) {
   console.log("🎮 Initializing Trivia module...");
 
-  // =====================================================
-  //  BUTTON HANDLERS  (A / B / C / D)
-  // =====================================================
-  bot.on("callback_query", async (ctx, next) => {
-    try {
-      const cbq = ctx.callbackQuery;
-      if (!cbq?.message?.chat?.id) return next();
+// =====================================================
+//  BUTTON HANDLERS  (A / B / C / D)
+// =====================================================
+bot.on("callback_query", async (ctx, next) => {
+  try {
+    const cbq = ctx.callbackQuery;
+    if (!cbq?.message?.chat?.id) return next();
 
-      const chatId = cbq.message.chat.id;
-      const userId = ctx.from.id;
-      const data = cbq.data;
-      const game = activeGames[chatId];
+    const chatId = cbq.message.chat.id;
+    const userId = ctx.from.id;
+    const data = cbq.data;
+    const game = activeGames[chatId];
 
-      if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
+    if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
-      // Accept "A", "B", "C", "D" and "A_<chatId>"
-      const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
-      if (!match) return next();
+    // Accept "A", "B", "C", "D" and "A_<chatId>"
+    const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
+    if (!match) return next();
 
-      const choice = match[1];
-      const cbChatId = match[2] ? Number(match[2]) : chatId;
+    const choice = match[1];
+    const cbChatId = match[2] ? Number(match[2]) : chatId;
 
-      // Ignore mismatched chat
-      if (cbChatId !== chatId)
-        return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
+    // Ignore mismatched chat
+    if (cbChatId !== chatId)
+      return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
 
-      // Ignore duplicates
-      if (game.answers[userId])
-        return ctx.answerCbQuery("😼 You already answered!");
+    // Make sure answers object exists even if timer fired early
+    if (!game.answers) game.answers = {};
 
-      // Record and confirm
-      game.answers[userId] = choice;
-      console.log(`🎯 ${ctx.from.username || userId} picked ${choice}`);
-      await ctx.answerCbQuery(`✅ ${choice} locked in`);
-    } catch (err) {
-      console.error("🔥 CALLBACK ERROR:", err);
-      try { await ctx.answerCbQuery("⚠️ Callback handling failed"); } catch {}
-    }
-  });
+    // Ignore duplicates
+    if (game.answers[userId])
+      return ctx.answerCbQuery("😼 You already answered!");
+
+    // Record and confirm
+    game.answers[userId] = choice;
+    console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
+
+    await ctx.answerCbQuery(`✅ ${choice} locked in`);
+  } catch (err) {
+    console.error("🔥 CALLBACK ERROR:", err);
+    try { await ctx.answerCbQuery("⚠️ Callback handling failed"); } catch {}
+  }
+});
+
 
   bot.action("ignore", async (ctx) => ctx.answerCbQuery());
 
@@ -230,7 +235,11 @@ function nextQuestion(ctxOrChatId) {
     parse_mode: "Markdown",
   }).catch(err => console.error("⚠️ sendMessage failed:", err));
 
-  game.timer = setTimeout(() => checkAnswers(chatId), QUESTION_TIME);
+game.timer = setTimeout(() => {
+  console.log(`🕒 Time's up for question ${game.currentIndex + 1}, checking answers...`);
+  checkAnswers(chatId);
+}, QUESTION_TIME);
+
 }
 
 // =====================================================
