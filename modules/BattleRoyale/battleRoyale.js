@@ -194,18 +194,28 @@ async function forceEndBattle(ctx) {
 
   if (!gameState.active) return ctx.reply("No active battle to end.");
 
-  if (gameState.alive.length === 0)
-    return announce(ctx, "😿 All cats are gone... No winner today!");
+  if (gameState.alive.length === 0) {
+    ctx.reply("😿 All cats are gone... No winner today!");
+  } else {
+    const winner = pick(gameState.alive);
+    ctx.reply(
+      `💥 *${ctx.from.first_name}* has force-ended the Battle Royale!\n\n🏆 *${winner}* is declared the **Chillest Cat Alive™!** 😼`,
+      { parse_mode: "Markdown" }
+    );
+  }
 
-  const winner = pick(gameState.alive);
-  sendMsg(
-    ctx,
-    `💥 *${ctx.from.first_name}* has force-ended the Battle Royale!\n\n🏆 *${winner}* is declared the **Chillest Cat Alive™!** 😼`
-  );
+  // ✅ Fully reset game state so no one can /brjoin afterward
+  gameState = {
+    active: false,
+    joinOpen: false,
+    alive: [],
+    dead: [],
+    startTime: null,
+    timers: [],
+    rounds: 0,
+  };
 
-  gameState.active = false;
-  gameState.joinOpen = false;
-  gameState.timers.forEach(clearTimeout);
+  ctx.reply("🏁 The arena has been cleared. Start a new one with /brstart when ready!");
 }
 
 /* -----------------------------------------------------
