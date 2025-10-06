@@ -45,21 +45,6 @@
  * v1.0.0 - Initial Telegraf setup
  * =====================================================
  */
-/**
- * =====================================================
- * ChilledCatBot - Bot Loader - bot.js
- * =====================================================
- * Initializes Telegraf + loads modules
- * =====================================================
- */
-
-/**
- * =====================================================
- * ChilledCatBot - Bot Loader - bot.js
- * =====================================================
- * Initializes Telegraf + loads modules
- * =====================================================
- */
 
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
@@ -75,14 +60,27 @@ const { setupBattleRoyale } = require("./modules/BattleRoyale");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN");
 
+// =====================================================
+//  Initialize Telegraf
+// =====================================================
 const bot = new Telegraf(BOT_TOKEN);
+global.bot = bot; // ✅ make available to trivia/troll modules
+
+// =====================================================
+//  Debugging (optional, safe to remove later)
+// =====================================================
+bot.on("message", (ctx) => {
+  console.log("📨 MESSAGE RECEIVED:", ctx.message.text);
+});
 
 bot.on("callback_query", (ctx) => {
   console.log("📬 GLOBAL CALLBACK RECEIVED:", ctx.callbackQuery.data);
-  ctx.answerCbQuery("✅ Received!");
+  ctx.answerCbQuery().catch(() => {});
 });
 
-// ✅ Load Features
+// =====================================================
+//  Load Features
+// =====================================================
 setupCommands(bot);
 setupContests(bot);
 setupGroupGuard(bot);
@@ -93,32 +91,26 @@ setupHowChill(bot);
 setupBattleRoyale(bot);
 setupTrivia(bot);
 
-// ✅ Safe Polling Launch (Fix for 409 conflict)
+// =====================================================
+//  Safe Polling Launch (recommended for Render)
+// =====================================================
 (async () => {
   try {
-    console.log("🌐 Clearing existing webhooks...");
+    console.log("🌐 Ensuring webhook is disabled...");
     await bot.telegram.deleteWebhook({ drop_pending_updates: true });
 
-    // 🔍 DEBUG: Check if bot receives messages
-    bot.on("message", (ctx) => {
-      console.log("📨 MESSAGE RECEIVED:", ctx.message.text);
-    });
-
-    // 🔍 DEBUG: Check if bot receives callback queries (button presses)
-    bot.on("callback_query", (ctx) => {
-      console.log("📬 GLOBAL CALLBACK:", ctx.callbackQuery.data);
-      ctx.answerCbQuery("Callback captured!");
-    });
-
     console.log("🚀 Launching bot in polling mode...");
-    await bot.launch();
+    await bot.launch({ dropPendingUpdates: true });
 
     console.log("😺 ChilledCatBot is online and ready to chill (polling mode).");
   } catch (err) {
     console.error("❌ Bot launch failed:", err);
   }
 })();
-// ✅ Graceful Shutdown
+
+// =====================================================
+//  Graceful Shutdown
+// =====================================================
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
