@@ -26,6 +26,9 @@ bot.on("callback_query", async (ctx, next) => {
 
     const chatId = cbq.message.chat.id;
     const userId = ctx.from.id;
+
+console.log("🧩 Raw callback data received:", data);
+
     const data = cbq.data;
     const match = /^([ABCD])(?:_(-?\d+))?$/.exec(data || "");
     if (!match) return next();
