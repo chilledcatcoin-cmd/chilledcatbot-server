@@ -79,19 +79,27 @@ bot.on("callback_query", async (ctx, next) => {
   const cbq = ctx.callbackQuery;
   if (!cbq) return next();
 
-  // ✅ Let games pass through to commands.js
-  if (cbq.game_short_name) {
-    console.log(`🎮 Game callback received for: ${cbq.game_short_name}`);
-    // Don't return here! Just log and continue
-    return next(); 
-  }
+// ✅ Handle Telegram games (Flappy Cat, CatSweeper)
+if (cbq.game_short_name) {
+  console.log(`🎮 Launching Telegram game: ${cbq.game_short_name}`);
+  return ctx.answerCbQuery(); // allow Telegram to open the HTML game
+}
 
-  // Other callback data (Trivia, Battle Royale, etc.)
 if (cbq.data) {
   console.log("📬 GLOBAL CALLBACK RECEIVED:", cbq.data);
-  // ⚠️ Don’t automatically answer all callback queries — pass to next handlers
-  return next();
+
+  // 🧠 Only handle truly global callbacks, not games or trivia
+  const data = cbq.data || "";
+  if (/^(A|B|C|D)_/.test(data)) {
+    // It’s a trivia button — let trivia.js handle it
+    return next();
+  }
+
+  // Handle other callbacks (Battle Royale, etc.)
+  await ctx.answerCbQuery("✅ Received!");
+  return;
 }
+
 
   return next();
 });
