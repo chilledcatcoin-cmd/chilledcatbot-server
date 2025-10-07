@@ -42,7 +42,8 @@ bot.on("callback_query", async (ctx, next) => {
 
     // ✅ Save answer safely and persist immediately
     game.answers[userId] = choice;
-    activeGames[chatId] = { ...game }; // force re-store (not by reference)
+    activeGames[chatId] = game;
+    console.log("✅ Answer stored:", activeGames[chatId].answers);
     console.log(`🎯 ${ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
     console.log(`📥 Answers snapshot now:`, activeGames[chatId].answers);
 
@@ -210,9 +211,10 @@ function nextQuestion(ctxOrChatId) {
   game.currentIndex++;
   game.answers = {};
 
-  if (game.currentIndex >= game.questions.length) {
-    return endTrivia({ chat: { id: chatId } });
-  }
+if (game.currentIndex >= game.questions.length) {
+  return endTrivia(chatId);
+}
+
 
   const q = game.questions[game.currentIndex];
   const progress = `🧠 *Question ${game.currentIndex + 1}/${QUESTIONS_PER_GAME}:*`;
@@ -247,7 +249,7 @@ function nextQuestion(ctxOrChatId) {
 //  CHECK ANSWERS — uses chatId directly
 // =====================================================
 function checkAnswers(chatId) {
-const game = { ...activeGames[chatId] }; // clone current snapshot to avoid stale ref
+const game = activeGames[chatId];
 
   if (!game) return;
 
@@ -280,8 +282,7 @@ const game = { ...activeGames[chatId] }; // clone current snapshot to avoid stal
 // =====================================================
 //  END TRIVIA
 // =====================================================
-function endTrivia(ctx, note) {
-  const chatId = ctx.chat.id;
+function endTrivia(chatId, note) {
   const game = activeGames[chatId];
   if (!game) return;
 
@@ -305,10 +306,13 @@ function endTrivia(ctx, note) {
   }
 
   if (note) msg += `\n\n${note}`;
-  ctx.reply(msg, { parse_mode: "Markdown" });
+
+  // ✅ Use telegram directly
+  global.bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
 
   clearTimeout(game.timer);
   delete activeGames[chatId];
 }
+
 
 module.exports = { setupTrivia };
