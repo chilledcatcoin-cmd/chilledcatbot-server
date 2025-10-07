@@ -32,20 +32,19 @@ bot.on("callback_query", async (ctx, next) => {
 
     const choice = match[1];
     const cbChatId = match[2] ? Number(match[2]) : chatId;
-    if (cbChatId !== chatId) return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
+    if (cbChatId !== chatId)
+      return ctx.answerCbQuery("⚠️ Stale button, new question is live.");
 
     const game = activeGames[chatId];
     if (!game) return ctx.answerCbQuery("❌ No trivia game running.");
 
-    if (!game.answers) game.answers = {};
     if (game.answers[userId]) return ctx.answerCbQuery("😼 You already answered!");
 
-    // ✅ Save answer safely and persist immediately
+    // ✅ Save directly into the shared reference
     game.answers[userId] = choice;
-    activeGames[chatId] = game;
-    console.log("✅ Answer stored:", activeGames[chatId].answers);
-    console.log(`🎯 ${ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
-    console.log(`📥 Answers snapshot now:`, activeGames[chatId].answers);
+
+    console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
+    console.log("📥 Answers now:", activeGames[chatId].answers);
 
     await ctx.answerCbQuery(`✅ ${choice} locked in`);
   } catch (err) {
@@ -208,8 +207,8 @@ function nextQuestion(ctxOrChatId) {
   const game = activeGames[chatId];
   if (!game) return;
 
-  game.currentIndex++;
-  game.answers = {};
+game.currentIndex++;
+activeGames[chatId].answers = {};
 
 if (game.currentIndex >= game.questions.length) {
   return endTrivia(chatId);
@@ -254,6 +253,10 @@ const game = activeGames[chatId];
   if (!game) return;
 
   console.log("🧮 Checking answers:", game.answers);
+
+if (!game.answers || Object.keys(game.answers).length === 0) {
+  console.warn("⚠️ No answers found — might have been cleared too early.");
+}
 
   const q = game.questions[game.currentIndex];
   const correct = ["A", "B", "C", "D"][q.answer];
