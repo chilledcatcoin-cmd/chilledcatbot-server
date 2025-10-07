@@ -208,7 +208,6 @@ function nextQuestion(ctxOrChatId) {
   if (!game) return;
 
 game.currentIndex++;
-activeGames[chatId].answers = {};
 
 if (game.currentIndex >= game.questions.length) {
   return endTrivia(chatId);
@@ -227,11 +226,15 @@ const keyboard = {
   ]],
 };
 
+// ✅ Reset answers *after* preparing question but before sending it
+activeGames[chatId].answers = {};
+
 // ✅ Display question
 global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
   reply_markup: keyboard,
   parse_mode: "Markdown",
 }).catch(err => console.error("⚠️ sendMessage failed:", err));
+
 
 
   // ✅ Set question timer with grace period
