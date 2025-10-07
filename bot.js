@@ -87,10 +87,11 @@ bot.on("callback_query", async (ctx, next) => {
   }
 
   // Other callback data (Trivia, Battle Royale, etc.)
-  if (cbq.data) {
-    console.log("📬 GLOBAL CALLBACK RECEIVED:", cbq.data);
-    await ctx.answerCbQuery("✅ Received!");
-  }
+if (cbq.data) {
+  console.log("📬 GLOBAL CALLBACK RECEIVED:", cbq.data);
+  // ⚠️ Don’t automatically answer all callback queries — pass to next handlers
+  return next();
+}
 
   return next();
 });
