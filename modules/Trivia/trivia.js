@@ -205,6 +205,7 @@ async function startTrivia(ctx, topicKey, adminId) {
 function nextQuestion(ctxOrChatId) {
   const chatId = typeof ctxOrChatId === "object" ? ctxOrChatId.chat.id : ctxOrChatId;
   const game = activeGames[chatId];
+if (game.waitingNext) delete game.waitingNext;
   if (!game) return;
 
 game.currentIndex++;
@@ -282,7 +283,14 @@ if (!game.answers || Object.keys(game.answers).length === 0) {
     .then(() => console.log("✅ Results sent for question", game.currentIndex + 1))
     .catch(err => console.error("⚠️ Failed to send result:", err));
 
-  setTimeout(() => nextQuestion(chatId), BREAK_TIME);
+setTimeout(() => {
+  // ✅ only move to next question if the game still exists and no timer is pending
+  const g = activeGames[chatId];
+  if (g && !g.waitingNext) {
+    g.waitingNext = true;
+    nextQuestion(chatId);
+  }
+}, BREAK_TIME);
 }
 
 // =====================================================
