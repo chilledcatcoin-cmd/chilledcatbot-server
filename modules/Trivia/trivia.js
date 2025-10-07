@@ -40,13 +40,33 @@ bot.on("callback_query", async (ctx, next) => {
 
     if (game.answers[userId]) return ctx.answerCbQuery("😼 You already answered!");
 
-    // ✅ Save directly into the shared reference
-    game.answers[userId] = choice;
+// ✅ Save answer
+game.answers[userId] = choice;
+const total = Object.keys(game.answers).length;
 
-    console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
-    console.log("📥 Answers now:", activeGames[chatId].answers);
+console.log(`🎯 ${ctx.from.username || ctx.from.first_name} picked ${choice} for Q${game.currentIndex + 1}`);
+console.log("📥 Answers now:", activeGames[chatId].answers);
 
-    await ctx.answerCbQuery(`✅ ${choice} locked in`);
+// ✅ Acknowledge answer
+await ctx.answerCbQuery(`✅ ${choice} locked in`);
+
+// ✅ Try to update the question message to show count
+try {
+  const originalText = cbq.message.text.split("\n\n📊")[0]; // remove any old count if present
+  await ctx.telegram.editMessageText(
+    chatId,
+    cbq.message.message_id,
+    null,
+    `${originalText}\n\n📊 ${total} player${total > 1 ? "s" : ""} have answered...`,
+    {
+      parse_mode: "Markdown",
+      reply_markup: cbq.message.reply_markup,
+    }
+  );
+} catch (err) {
+  console.warn("⚠️ Failed to update player count:", err.message);
+}
+
   } catch (err) {
     console.error("🔥 CALLBACK ERROR:", err);
     try { await ctx.answerCbQuery("⚠️ Callback handling failed"); } catch {}
