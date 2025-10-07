@@ -214,25 +214,25 @@ if (game.currentIndex >= game.questions.length) {
   return endTrivia(chatId);
 }
 
+const q = game.questions[game.currentIndex];
+const progress = `🧠 *Question ${game.currentIndex + 1}/${QUESTIONS_PER_GAME}:*`;
+const { text } = formatQuestion(q, game.currentIndex + 1);
 
-  const q = game.questions[game.currentIndex];
-  const progress = `🧠 *Question ${game.currentIndex + 1}/${QUESTIONS_PER_GAME}:*`;
-  const { text } = formatQuestion(q, game.currentIndex + 1);
+const keyboard = {
+  inline_keyboard: [[
+    { text: "A", callback_data: `A_${chatId}` },
+    { text: "B", callback_data: `B_${chatId}` },
+    { text: "C", callback_data: `C_${chatId}` },
+    { text: "D", callback_data: `D_${chatId}` },
+  ]],
+};
 
-  const keyboard = {
-    inline_keyboard: [[
-      { text: "A", callback_data: `A_${chatId}` },
-      { text: "B", callback_data: `B_${chatId}` },
-      { text: "C", callback_data: `C_${chatId}` },
-      { text: "D", callback_data: `D_${chatId}` },
-    ]],
-  };
+// ✅ Display question
+global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
+  reply_markup: keyboard,
+  parse_mode: "Markdown",
+}).catch(err => console.error("⚠️ sendMessage failed:", err));
 
-  // ✅ Display question
-  global.bot.telegram.sendMessage(chatId, `${progress}\n\n${text}`, {
-    reply_markup: keyboard,
-    parse_mode: "Markdown",
-  }).catch(err => console.error("⚠️ sendMessage failed:", err));
 
   // ✅ Set question timer with grace period
   game.timer = setTimeout(() => {
