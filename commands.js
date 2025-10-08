@@ -52,35 +52,68 @@ function setupCommands(bot) {
         "Available commands:\n" +
         "🧊 /howchill — Check how chill you are\n" +
         "🔮 /fortune — Receive a Chilled Cat Fortune™\n" +
-        "• /br — View Battle Royale commands\n" +
+        "⚔️ /br — View Battle Royale commands\n" +
         "🏓 /ping — Test if the bot is alive\n" +
         "\nStay tuned for more Chilled Cat features! 😼",
       { parse_mode: "Markdown" }
     );
   });
 
+  // 💡 Help command
   bot.help((ctx) =>
     ctx.reply(
       "💡 Need help?\n\n" +
         "• /howchill — Find your Chill Level™\n" +
         "• /fortune — Receive a Chilled Cat Fortune™\n" +
+        "• /br — View Battle Royale commands (groups only)\n" +
         "• /ping — Check if the bot is alive\n" +
-        "\nStay tuned for more Chilled Cat features! 😼"
+        "\nStay tuned for more Chilled Cat features! 😼",
+      { parse_mode: "Markdown" }
     )
   );
 
   // 🏓 Simple ping test
   bot.command("ping", (ctx) => ctx.reply("🏓 Pong!"));
 
-  // 📜 Set Telegram menu command list
-  bot.telegram
-    .setMyCommands([
-      { command: "howchill", description: "Check your Chill Level™" },
-      { command: "fortune", description: "Receive a Chilled Cat Fortune™" },
-      { command: "br", description: "View Battle Royale command list" },
-      { command: "ping", description: "Check if bot is alive" },
-    ])
-    .then(() => console.log("✅ Command list updated."));
+  // 📜 Telegram command menus (split for DMs & Groups)
+  Promise.all([
+    // ✅ Default — DMs & private chats
+    bot.telegram.setMyCommands(
+      [
+        { command: "howchill", description: "Check your Chill Level™" },
+        { command: "fortune", description: "Receive a Chilled Cat Fortune™" },
+        { command: "ping", description: "Check if bot is alive" },
+      ],
+      { scope: { type: "default" } }
+    ),
+
+    // ✅ All Group Chats
+    bot.telegram.setMyCommands(
+      [
+        { command: "howchill", description: "Check your Chill Level™" },
+        { command: "fortune", description: "Receive a Chilled Cat Fortune™" },
+        { command: "br", description: "View Battle Royale command list" },
+        { command: "ping", description: "Check if bot is alive" },
+        { command: "br", description: "View Battle Royale command list" },
+        { command: "brstart", description: "Start a new Battle Royale (admin)" },
+        { command: "brcancel", description: "Cancel the current Battle Royale" },
+        { command: "brforceend", description: "Force-end and declare a winner" },
+        { command: "brjoin", description: "Join the current battle" },
+        { command: "brleave", description: "Leave or forfeit" },
+        { command: "roll", description: "Roll during a duel" },
+        { command: "brstatus", description: "Check current battle status" },
+      ],
+      { scope: { type: "all_group_chats" } }
+    ),
+  ])
+    .then(() => {
+      console.log("✅ Telegram command menus updated:");
+      console.log("   • Default (DMs) ✅");
+      console.log("   • Group Chats ✅");
+    })
+    .catch((err) =>
+      console.error("❌ Failed to set Telegram command menus:", err)
+    );
 }
 
 module.exports = { setupCommands };
