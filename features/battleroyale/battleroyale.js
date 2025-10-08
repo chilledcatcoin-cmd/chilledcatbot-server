@@ -43,7 +43,8 @@
  * v1.2.0 - A fresh start
  * =====================================================
  */
-const { performDuelRoll } = require("../duel/duel");
+
+const { performDuelRoll, setActiveDuelContext } = require("../duel/duel");
 
 const {
   killEvents,
@@ -173,6 +174,11 @@ async function startBattle(ctx) {
   };
 
   startJoinTimers();
+
+  // 🎮 Register Battle Royale as the active duel context
+  setActiveDuelContext({
+    onDuelCommand: (ctx) => handleBattleRoll(ctx),
+  });
 }
 
 function joinBattle(ctx) {
@@ -219,6 +225,7 @@ async function cancelBattle(ctx) {
   if (!gameState.active) return ctx.reply("No battle to cancel.");
   gameState.active = false;
   gameState.timers.forEach(clearTimeout);
+  setActiveDuelContext(null);
   sendMsg(ctx, "❌ The Chilled Cat Battle Royale has been cancelled.");
 }
 
@@ -241,6 +248,8 @@ async function forceEndBattle(ctx) {
       { parse_mode: "Markdown" }
     );
   }
+
+ setActiveDuelContext(null); 
 
   // ✅ Fully reset game state so no one can /brjoin afterward
   gameState = {
@@ -412,6 +421,7 @@ function reviveEvent(ctx) {
  * ----------------------------------------------------- */
 function endBattle(ctx) {
   gameState.active = false;
+  setActiveDuelContext(null)
 
   if (Math.random() < CONFIG.DRAW_CHANCE)
     return ctx.telegram.sendMessage(ctx.chat.id, "😺 The battle ends in a draw! All cats nap peacefully. 💤");
@@ -486,7 +496,7 @@ function sendHelp(ctx) {
       "💥 `/brforceend` — Force-end and declare winner (admin)\n" +
       "🐾 `/brjoin` — Join the active battle\n" +
       "🚪 `/brleave` — Leave or forfeit\n" +
-      "🎲 `/roll` — Roll during a duel\n" +
+      "⚔️ `/duel` — Duel during an active battle\n" +
       "📊 `/brstatus` — Check game status\n\n" +
       "✨ Type `/brstart` or tap from the list below!",
     { parse_mode: "Markdown" }
