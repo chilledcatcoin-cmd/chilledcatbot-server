@@ -52,8 +52,9 @@ function setupCommands(bot) {
         "Available commands:\n" +
         "🧊 /howchill — Check how chill you are\n" +
         "🔮 /fortune — Receive a Chilled Cat Fortune™\n" +
+        "• /br — View Battle Royale commands\n" +
         "🏓 /ping — Test if the bot is alive\n" +
-        "\nMore features coming soon!",
+        "\nStay tuned for more Chilled Cat features! 😼",
       { parse_mode: "Markdown" }
     );
   });
@@ -76,6 +77,7 @@ function setupCommands(bot) {
     .setMyCommands([
       { command: "howchill", description: "Check your Chill Level™" },
       { command: "fortune", description: "Receive a Chilled Cat Fortune™" },
+      { command: "br", description: "View Battle Royale command list" },
       { command: "ping", description: "Check if bot is alive" },
     ])
     .then(() => console.log("✅ Command list updated."));
