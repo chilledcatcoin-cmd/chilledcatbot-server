@@ -34,40 +34,61 @@
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
- * ChilledCatBot - Core Initialzer - bot.js - Creates telegraf bot instance, connects commands 
- * and feature modules, exports the ready-to-use bot instance to be mounted by the express
- * server in index.js
- * Builds the brain, installs instincts and exports it.
- * Version: 1.6.0
+ * ChilledCatBot - Duel Feature - duel.js - Handles: global /duel command & shared duel roll logic
+ *
+ * Version: 1.1.0
  * Date: 2025-10-08
  *
  * Changelog:
- * v1.6.0 - A fresh start
+ * v1.1.0 - Breaking it off and making duel its own feature that can be used in multiple games
  * =====================================================
  */
 
-const { Telegraf } = require("telegraf");
-const { setupCommands } = require("./commands");
-const { setupHowChill } = require("./features/howchill");
-const { setupFortune } = require("./features/fortune");
-const { setupBattleRoyale } = require("./features/battleroyale");
-const { setupDuelFeature } = require("./duel");
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
+/**
+ * 🎲 Utility for other modules (Battle Royale, CoC, etc.)
+ * Returns { name, emoji, roll }
+ */
+async function performDuelRoll(ctx, playerName) {
+  const emoji = pick(["🎲", "🎯", "🏀", "🎳", "🎰"]);
+  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji });
+  return {
+    name: playerName,
+    emoji,
+    roll: diceMsg.dice.value,
+  };
+}
 
-const bot = new Telegraf(BOT_TOKEN);
+/**
+ * ⚔️ Global /duel command
+ * Works anywhere — DMs or group chats
+ */
+async function handleGlobalDuel(ctx) {
+  const challenger = `@${ctx.from.username || ctx.from.first_name}`;
 
-// 👋 Basic test command
-bot.start((ctx) => ctx.reply("😺 ChilledCatBot is alive and ready to chill!"));
+  // In future we can expand this to support "/duel @target"
+  // For now, it’s just a single dice duel against fate itself 😼
+  const result = await performDuelRoll(ctx, challenger);
 
-// 🧊 Load first feature
-setupCommands(bot);
-setupHowChill(bot);
-setupFortune(bot);
-setupBattleRoyale(bot);
-setupDuelFeature(bot); 
+  await ctx.telegram.sendMessage(
+    ctx.chat.id,
+    `${result.emoji} ${challenger} duels fate and rolls a *${result.roll}*!`,
+    { parse_mode: "Markdown" }
+  );
+}
 
-console.log("✅ Commands, HowChill, Fortune, and Battle Royale loaded.");
+/**
+ * 🔧 Registers /duel command globally
+ */
+function setupDuelFeature(bot) {
+  bot.command("duel", handleGlobalDuel);
+  console.log("⚔️ Duel feature loaded. /duel command active globally.");
+}
 
-module.exports = { bot };
+module.exports = {
+  setupDuelFeature,
+  performDuelRoll,
+};

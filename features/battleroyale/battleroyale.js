@@ -43,6 +43,7 @@
  * v1.2.0 - A fresh start
  * =====================================================
  */
+const { performDuelRoll } = require("../duel/duel");
 
 const {
   killEvents,
@@ -324,19 +325,21 @@ function triggerDuel(ctx) {
   duel.timeout = setTimeout(() => resolveDuel(ctx), CONFIG.DUEL_TIMEOUT);
 }
 
-async function handleRoll(ctx) {
+async function handleBattleRoll(ctx) {
   const name = `@${ctx.from.username || ctx.from.first_name}`;
   if (!duel.active) return ctx.reply("🎮 There’s no active duel!");
   if (![duel.playerA, duel.playerB].includes(name))
     return ctx.reply("😼 You’re not part of the duel!");
   if (duel.rolls[name]) return ctx.reply("🐾 You already rolled!");
 
-  const emoji = pick(["🎲", "🎯", "🏀", "🎳", "🎰"]);
-  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji });
-  const roll = diceMsg.dice.value;
-  duel.rolls[name] = roll;
+  const result = await performDuelRoll(ctx, name);
+  duel.rolls[name] = result.roll;
 
-  await ctx.telegram.sendMessage(ctx.chat.id, `${emoji} ${name} rolled a *${roll}*!`, { parse_mode: "Markdown" });
+  await ctx.telegram.sendMessage(
+    ctx.chat.id,
+    `${result.emoji} ${name} rolled a *${result.roll}*!`,
+    { parse_mode: "Markdown" }
+  );
 
   if (duel.rolls[duel.playerA] && duel.rolls[duel.playerB]) {
     clearTimeout(duel.timeout);
@@ -451,7 +454,6 @@ function setupBattleRoyale(bot) {
   bot.command("brforceend", forceEndBattle);
   bot.command("brjoin", joinBattle);
   bot.command("brleave", leaveBattle);
-  bot.command("roll", handleRoll);
   bot.command("brstatus", (ctx) => sendStatus(ctx));
   bot.command("br", (ctx) => sendHelp(ctx));
 

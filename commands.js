@@ -100,7 +100,7 @@ function setupCommands(bot) {
         { command: "brforceend", description: "Force-end and declare a winner" },
         { command: "brjoin", description: "Join the current battle" },
         { command: "brleave", description: "Leave or forfeit" },
-        { command: "roll", description: "Roll during a duel" },
+        { command: "duel", description: "Roll during a duel" },
         { command: "brstatus", description: "Check current battle status" },
       ],
       { scope: { type: "all_group_chats" } }

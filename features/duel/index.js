@@ -34,40 +34,15 @@
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
- * ChilledCatBot - Core Initialzer - bot.js - Creates telegraf bot instance, connects commands 
- * and feature modules, exports the ready-to-use bot instance to be mounted by the express
- * server in index.js
- * Builds the brain, installs instincts and exports it.
- * Version: 1.6.0
+ * ChilledCatBot - Duel - index.js
+ *
+ * Version: 1.0.0
  * Date: 2025-10-08
  *
  * Changelog:
- * v1.6.0 - A fresh start
+ * v1.0.0 - Index.js
  * =====================================================
  */
 
-const { Telegraf } = require("telegraf");
-const { setupCommands } = require("./commands");
-const { setupHowChill } = require("./features/howchill");
-const { setupFortune } = require("./features/fortune");
-const { setupBattleRoyale } = require("./features/battleroyale");
-const { setupDuelFeature } = require("./duel");
-
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
-
-const bot = new Telegraf(BOT_TOKEN);
-
-// 👋 Basic test command
-bot.start((ctx) => ctx.reply("😺 ChilledCatBot is alive and ready to chill!"));
-
-// 🧊 Load first feature
-setupCommands(bot);
-setupHowChill(bot);
-setupFortune(bot);
-setupBattleRoyale(bot);
-setupDuelFeature(bot); 
-
-console.log("✅ Commands, HowChill, Fortune, and Battle Royale loaded.");
-
-module.exports = { bot };
+const { setupDuelFeature, performDuelRoll } = require("./duel");
+module.exports = { setupDuelFeature, performDuelRoll };
