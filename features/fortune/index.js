@@ -34,51 +34,15 @@
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
- * ChilledCatBot - Commands - commands.js - Handles /start, /help, and Telegram command menu
+ * ChilledCatBot - Fortune Connector File - index.js
  *
- * Version: 1.3.0
+ * Version: 1.0.0
  * Date: 2025-10-08
  *
  * Changelog:
- * v1.3.0 - A fresh start
+ * v1.0.0 - Index.js
  * =====================================================
  */
 
-function setupCommands(bot) {
-  // 🎮 Welcome & Help
-  bot.start((ctx) => {
-    ctx.reply(
-      "😺 *Welcome to ChilledCatBot!*\n\n" +
-        "Available commands:\n" +
-        "🧊 /howchill — Check how chill you are\n" +
-        "🔮 /fortune — Receive a Chilled Cat Fortune™\n" +
-        "🏓 /ping — Test if the bot is alive\n" +
-        "\nMore features coming soon!",
-      { parse_mode: "Markdown" }
-    );
-  });
-
-  bot.help((ctx) =>
-    ctx.reply(
-      "💡 Need help?\n\n" +
-        "• /howchill — Find your Chill Level™\n" +
-        "• /fortune — Receive a Chilled Cat Fortune™\n" +
-        "• /ping — Check if the bot is alive\n" +
-        "\nStay tuned for more Chilled Cat features! 😼"
-    )
-  );
-
-  // 🏓 Simple ping test
-  bot.command("ping", (ctx) => ctx.reply("🏓 Pong!"));
-
-  // 📜 Set Telegram menu command list
-  bot.telegram
-    .setMyCommands([
-      { command: "howchill", description: "Check your Chill Level™" },
-      { command: "fortune", description: "Receive a Chilled Cat Fortune™" },
-      { command: "ping", description: "Check if bot is alive" },
-    ])
-    .then(() => console.log("✅ Command list updated."));
-}
-
-module.exports = { setupCommands };
+const { setupFortune } = require("./fortune");
+module.exports = { setupFortune };
