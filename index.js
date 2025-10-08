@@ -56,14 +56,26 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.RENDER_EXTERNAL_URL;
+const MODE = process.env.MODE || "webhook";
 
-if (!DOMAIN) {
-  throw new Error("❌ Missing RENDER_EXTERNAL_URL environment variable");
-}
+(async () => {
+  try {
+    if (MODE === "polling") {
+      console.log("🚀 Launching in polling mode...");
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      await bot.launch({ dropPendingUpdates: true });
+    } else {
+      if (!DOMAIN) throw new Error("❌ Missing RENDER_EXTERNAL_URL");
+      const path = `/bot${process.env.BOT_TOKEN}`;
+      await bot.telegram.setWebhook(`${DOMAIN}${path}`);
+      app.use(bot.webhookCallback(path));
+      app.get("/", (req, res) => res.send("✅ ChilledCatBot running via webhook"));
+      app.listen(PORT, () => console.log(`🌐 Webhook server active on ${PORT}`));
+    }
+  } catch (err) {
+    console.error("❌ Failed to start bot:", err);
+  }
+})();
 
-bot.telegram.setWebhook(`${DOMAIN}/bot${process.env.BOT_TOKEN}`);
-app.use(bot.webhookCallback(`/bot${process.env.BOT_TOKEN}`));
-
-app.get("/", (req, res) => res.send("✅ Chilled Cat Bot is running via webhook"));
-
-app.listen(PORT, () => console.log(`🚀 Server running on ${PORT}`));
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
