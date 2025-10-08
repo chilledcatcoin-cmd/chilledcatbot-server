@@ -85,21 +85,33 @@ async function handleGlobalDuel(ctx) {
 }
 
 /* -----------------------------------------------------
+ *  Challenge System with Cooldown
+ * ----------------------------------------------------- */
+const COOLDOWN_MS = 15000; // 15 seconds
+const duelCooldowns = new Map(); // chatId → timestamp
+
+/* -----------------------------------------------------
  *  /challenge (PvP Duel)
  * ----------------------------------------------------- */
 async function handleChallenge(ctx) {
   const challenger = `@${ctx.from.username || ctx.from.first_name}`;
   const chatId = ctx.chat.id;
+  const now = Date.now();
 
-  // Prevent spam: only one challenge at a time per chat
+  // 🚫 Prevent spam — check cooldown
+  if (duelCooldowns.has(chatId) && now - duelCooldowns.get(chatId) < COOLDOWN_MS) {
+    const remaining = Math.ceil((COOLDOWN_MS - (now - duelCooldowns.get(chatId))) / 1000);
+    return ctx.reply(`⌛ Please wait ${remaining}s before starting another duel.`);
+  }
+
+  // 🚫 Prevent overlapping challenges
   if (activeChallenges.has(chatId)) {
     return ctx.reply("⚠️ There's already an open challenge in this chat!");
   }
 
-  // Store challenger info
+  // ✅ Record challenge
   activeChallenges.set(chatId, { challengerId: ctx.from.id, challenger });
 
-  // Send challenge message with button
   const message = await ctx.replyWithMarkdown(
     `😼 *${challenger}* has issued a duel challenge!\nClick below to accept.`,
     {
@@ -109,7 +121,7 @@ async function handleChallenge(ctx) {
     }
   );
 
-  // Auto-expire after 60 seconds
+  // ⏰ Auto-expire after 60 seconds
   setTimeout(() => {
     if (activeChallenges.has(chatId)) {
       activeChallenges.delete(chatId);
@@ -124,7 +136,7 @@ async function handleChallenge(ctx) {
 }
 
 /* -----------------------------------------------------
- *  Handle Button Response
+ *  Handle Button Response — Unified Duel Instance
  * ----------------------------------------------------- */
 async function handleAcceptDuel(ctx) {
   const chatId = ctx.chat.id;
@@ -145,8 +157,20 @@ async function handleAcceptDuel(ctx) {
     parse_mode: "Markdown",
   });
 
-  const r1 = await performDuelRoll(ctx, challenger);
-  const r2 = await performDuelRoll(ctx, opponent);
+  // 🧩 Shared duel instance
+  const duel = {
+    chatId,
+    challenger,
+    opponent,
+    results: {},
+  };
+
+  // Roll results within the same game
+  duel.results[challenger] = await performDuelRoll(ctx, challenger);
+  duel.results[opponent] = await performDuelRoll(ctx, opponent);
+
+  const r1 = duel.results[challenger];
+  const r2 = duel.results[opponent];
 
   let result;
   if (r1.roll > r2.roll)
@@ -156,7 +180,14 @@ async function handleAcceptDuel(ctx) {
   else result = `😼 It’s a draw! Both rolled ${r1.roll}!`;
 
   await ctx.replyWithMarkdown(result);
+
+  // 🧹 Set cooldown
+  duelCooldowns.set(chatId, Date.now());
+
+  return duel;
 }
+
+
 
 /* -----------------------------------------------------
  *  Context Management
