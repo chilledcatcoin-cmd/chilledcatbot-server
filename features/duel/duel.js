@@ -136,7 +136,7 @@ async function handleChallenge(ctx) {
 }
 
 /* -----------------------------------------------------
- *  Handle Button Response — Unified Duel Instance
+ *  Handle Button Response — Cinematic Duel Version
  * ----------------------------------------------------- */
 async function handleAcceptDuel(ctx) {
   const chatId = ctx.chat.id;
@@ -151,43 +151,63 @@ async function handleAcceptDuel(ctx) {
     return ctx.answerCbQuery("😹 You can’t duel yourself!");
   }
 
+  // Remove challenge record
   activeChallenges.delete(chatId);
 
+  // Announce duel start
   await ctx.editMessageText(`⚔️ *${challenger}* vs *${opponent}* — the duel begins!`, {
     parse_mode: "Markdown",
   });
 
-  // 🧩 Shared duel instance
+  // 🎲 One shared dice animation (the “start signal”)
+  const diceMsg = await ctx.telegram.sendDice(ctx.chat.id, { emoji: "🎲" });
+  const baseEmoji = diceMsg.dice.emoji;
+
+  // Wait a moment for animation to finish rolling
+  await new Promise((r) => setTimeout(r, 2500));
+
+  // 🎯 Challenger roll
+  const challengerRoll = Math.floor(Math.random() * 6) + 1;
+  await ctx.replyWithMarkdown(`🎯 ${challenger} rolls... *${challengerRoll}*!`);
+  await new Promise((r) => setTimeout(r, 2000));
+
+  // 🎯 Opponent roll
+  const opponentRoll = Math.floor(Math.random() * 6) + 1;
+  await ctx.replyWithMarkdown(`🎯 ${opponent} rolls... *${opponentRoll}*!`);
+  await new Promise((r) => setTimeout(r, 2000));
+
+  // 🧩 Shared duel object
   const duel = {
     chatId,
     challenger,
     opponent,
-    results: {},
+    results: {
+      [challenger]: challengerRoll,
+      [opponent]: opponentRoll,
+    },
   };
 
-  // Roll results within the same game
-  duel.results[challenger] = await performDuelRoll(ctx, challenger);
-  duel.results[opponent] = await performDuelRoll(ctx, opponent);
-
-  const r1 = duel.results[challenger];
-  const r2 = duel.results[opponent];
-
+  // 🧠 Determine outcome
   let result;
-  if (r1.roll > r2.roll)
-    result = `🏆 *${challenger}* wins the duel with a ${r1.roll} against ${r2.roll}!`;
-  else if (r2.roll > r1.roll)
-    result = `🏆 *${opponent}* wins the duel with a ${r2.roll} against ${r1.roll}!`;
-  else result = `😼 It’s a draw! Both rolled ${r1.roll}!`;
+  if (challengerRoll > opponentRoll)
+    result = `🏆 *${challenger}* wins with a ${challengerRoll} vs ${opponentRoll}!`;
+  else if (opponentRoll > challengerRoll)
+    result = `🏆 *${opponent}* wins with a ${opponentRoll} vs ${challengerRoll}!`;
+  else result = `😼 It’s a draw! Both rolled ${challengerRoll}!`;
 
-  await ctx.replyWithMarkdown(result);
+  // 🧾 Final reveal
+  await ctx.replyWithMarkdown(
+    `${baseEmoji} *Duel Results*\n\n` +
+      `🎯 ${challenger}: *${challengerRoll}*\n` +
+      `🎯 ${opponent}: *${opponentRoll}*\n\n` +
+      result
+  );
 
-  // 🧹 Set cooldown
+  // 🕒 Cooldown
   duelCooldowns.set(chatId, Date.now());
 
   return duel;
 }
-
-
 
 /* -----------------------------------------------------
  *  Context Management
