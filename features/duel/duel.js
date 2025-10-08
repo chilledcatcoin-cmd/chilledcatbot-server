@@ -98,10 +98,9 @@ async function handleChallenge(ctx) {
   const chatId = ctx.chat.id;
   const now = Date.now();
 
-  // 🚫 Prevent spam — check cooldown
+  // 🚫 Prevent spam — silent ignore if cooldown active
   if (duelCooldowns.has(chatId) && now - duelCooldowns.get(chatId) < COOLDOWN_MS) {
-    const remaining = Math.ceil((COOLDOWN_MS - (now - duelCooldowns.get(chatId))) / 1000);
-    return ctx.reply(`⌛ Please wait ${remaining}s before starting another duel.`);
+    return; // do nothing
   }
 
   // 🚫 Prevent overlapping challenges
