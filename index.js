@@ -35,7 +35,3 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
     console.error("❌ Failed to start webhook:", err);
   }
 })();
-
-// Graceful shutdown
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
