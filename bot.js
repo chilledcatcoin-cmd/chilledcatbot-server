@@ -49,7 +49,7 @@
 const { Telegraf } = require("telegraf");
 const { setupCommands } = require("./commands");
 const { setupHowChill } = require("./features/howchill");
-const { setupFortune } = require("./modules/fortune");
+const { setupFortune } = require("./features/fortune");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
