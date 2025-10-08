@@ -51,7 +51,7 @@ const { setupCommands } = require("./commands");
 const { setupHowChill } = require("./features/howchill");
 const { setupFortune } = require("./features/fortune");
 const { setupBattleRoyale } = require("./features/battleroyale");
-const { setupDuelFeature } = require("./duel");
+const { setupDuelFeature } = require("./features/duel");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
