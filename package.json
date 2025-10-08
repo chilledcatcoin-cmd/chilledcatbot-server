@@ -1,0 +1,12 @@
+{
+  "name": "chilledcatbot-server",
+  "version": "1.0.0",
+  "description": "Chilled Cat Telegram Bot",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  }
+}
