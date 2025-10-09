@@ -82,11 +82,24 @@ function setupGames(bot) {
       }
 
       // When user presses native game button
-      if (gameName && GAMES[gameName]) {
-        await ctx.answerGameQuery(GAMES[gameName].url);
-        console.log(`🎮 Launching game: ${gameName}`);
-        return;
-      }
+      const { contests } = require("../contests/contests");
+
+if (gameName && GAMES[gameName]) {
+  const chatId = ctx.chat?.id || ctx.from?.id;
+  const activeContest = contests.get(chatId);
+  let launchUrl = GAMES[gameName].url;
+
+  if (activeContest && activeContest.game === gameName) {
+    launchUrl += `?contest=${activeContest.key}`;
+    console.log(`🏁 Launching ${gameName} in CONTEST mode →`, launchUrl);
+  } else {
+    console.log(`🎮 Launching ${gameName} globally →`, launchUrl);
+  }
+
+  await ctx.answerGameQuery(launchUrl);
+  return;
+}
+
 
       return next();
     } catch (err) {

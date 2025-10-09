@@ -84,7 +84,7 @@ await ctx.reply(
         [
           {
             text: `🎮 Play ${gameInfo.title}`,
-            url: gameUrl,
+            callback_game: {},
           },
         ],
       ],
