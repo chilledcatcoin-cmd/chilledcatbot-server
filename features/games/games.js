@@ -1,26 +1,18 @@
 /**
  * =====================================================
- * ChilledCatBot - Games Registry
+ *  ChilledCatBot - Games List
  * =====================================================
  */
 
-const BASE_URL = "https://chilledcatcoin-cmd.github.io/chilledcatbot/games";
-
-const GAMES = {
+exports.GAMES = {
   flappycat: {
-    title: "Flappy Cat — A Chilled Cat Game",
-    url: `${BASE_URL}/flappycat/flappycat.html`,
+    title: "Flappy Cat",
+    description: "Tap to keep the Chilled Cat airborne and dodge pipes!",
+    url: "https://chilledcatbot-server.onrender.com/flappycat",
   },
   catsweeper: {
-    title: "CatSweeper ’97 — Minesweeper with Cats",
-    url: `${BASE_URL}/catsweeper/catsweeper.html`,
+    title: "CatSweeper",
+    description: "Classic minesweeper, but fluffier. Don’t bonk the tuna cans!",
+    url: "https://chilledcatbot-server.onrender.com/catsweeper",
   },
 };
-
-function listGames() {
-  return Object.entries(GAMES)
-    .map(([key, g]) => `🎮 *${g.title}*\n[Play Now](${g.url})`)
-    .join("\n\n");
-}
-
-module.exports = { GAMES, listGames };
