@@ -69,11 +69,23 @@ async function startContest(ctx, game, minutes = 10) {
 
   contests.set(ctx.chat.id, { game, key, expires, groupTitle });
 
-  const gameInfo = GAMES[game];
-  await ctx.replyWithMarkdown(
-    `🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.\n[Play Now](${gameInfo.url})`,
-    { disable_web_page_preview: false }
-  );
+await ctx.reply(
+  `🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.`,
+  {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: `🎮 Play ${gameInfo.title}`,
+            url: gameInfo.url,
+          },
+        ],
+      ],
+    },
+  }
+);
+
 
   scheduleUpdates(ctx, game, key, expires);
 }
