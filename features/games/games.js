@@ -10,12 +10,12 @@
 exports.GAMES = {
   flappycat: {
     title: "Flappy Cat",
-    url: "https://t.me/chilledcatbot?game=flappycat",
+    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/flappycat.html",
     description: "Fly through pipes and prove your chill reflexes.",
   },
   catsweeper: {
     title: "CatSweeper",
-    url: "https://t.me/chilledcatbot?game=catsweeper",
+    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html",
     description: "Classic minesweeper — but with furballs.",
   },
 };
