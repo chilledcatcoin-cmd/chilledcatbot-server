@@ -75,23 +75,21 @@ async function startContest(ctx, game, minutes = 10) {
 // Construct the game URL with contest key
 const gameUrl = `${gameInfo.url}?contest=${key}`;
 
-await ctx.reply(
-  `🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.`,
-  {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: `🎮 Play ${gameInfo.title}`,
-            callback_game: {},
-          },
-        ],
-      ],
-    },
-  }
-);
+// Step 1 — Send the contest info message (regular text)
+await ctx.reply(`🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.`, {
+  parse_mode: "Markdown",
+});
 
+// Step 2 — Send the actual Telegram Game Card
+await ctx.replyWithGame(game, {
+  reply_markup: {
+    inline_keyboard: [
+      [
+        { text: `🎮 Play ${gameInfo.title}`, callback_game: {} },
+      ],
+    ],
+  },
+});
 
   scheduleUpdates(ctx, game, key, expires);
 }
