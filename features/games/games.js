@@ -7,16 +7,16 @@
  * =====================================================
  */
 
-const GAMES = {
+exports.GAMES = {
   flappycat: {
     title: "Flappy Cat",
-    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/flappycat.html",
-    description: "Help Chilled Cat soar through pipes in this retro tribute to Flappy Bird!",
+    url: "https://chilledcat.github.io/flappycat/",
+    description: "Fly through pipes and prove your chill reflexes.",
   },
   catsweeper: {
     title: "CatSweeper",
-    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html",
-    description: "Classic minesweeper — but fluffier. Avoid the tuna bombs!",
+    url: "https://chilledcat.github.io/catsweeper/",
+    description: "Classic minesweeper — but with furballs.",
   },
 };
 
