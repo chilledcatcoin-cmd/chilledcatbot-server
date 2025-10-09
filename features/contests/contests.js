@@ -125,20 +125,29 @@ function scheduleUpdates(bot, chatId, game, key, expires) {
   const interval = totalDuration / 4;
 
   for (let i = 1; i <= 4; i++) {
-    setTimeout(async () => {
-      const c = contests.get(chatId);
-      if (!c || c.key !== key || Date.now() > c.expires) return;
+setTimeout(async () => {
+  const c = contests.get(chatId);
+  if (!c || c.key !== key) return;
 
-      try {
-        const list = await getLeaderboardCached(getStatName("contest", game, c.key), true);
-        const timeRemaining = c.expires - Date.now();
-        const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
-        await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" }); // ✅ FIXED
-        console.log(`📢 Sent contest update ${i}/4 to chat ${chatId}`);
-      } catch (err) {
-        console.error("⚠️ Failed to send contest update:", err);
-      }
-    }, interval * i);
+  const now = Date.now();
+  const timeRemaining = c.expires - now;
+
+  // 🧱 If contest expired, end it cleanly and stop updates
+  if (timeRemaining <= 0) {
+    await endContest({ bot, chatId }, game, true);
+    return;
+  }
+
+  try {
+    const list = await getLeaderboardCached(getStatName("contest", game, key));
+    const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
+    await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+    console.log(`📢 Sent contest update ${i}/4 to chat ${chatId}`);
+  } catch (err) {
+    console.error("⚠️ Failed to send contest update:", err);
+  }
+}, interval * i);
+
   }
 
   // End contest automatically
