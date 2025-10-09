@@ -56,16 +56,21 @@ function setupGames(bot) {
   });
 
   /**
-   * Handle clicks on /games inline buttons (launch_*)
-   * → reply with Telegram-native game card (so Telegram can open the webview)
+   * Handle game launch callbacks (launch_*, native game buttons)
+   * → Reply with Telegram-native game card or launch URL
    */
   bot.on("callback_query", async (ctx, next) => {
-    try {
-      const data = ctx.callbackQuery?.data;
-      const gameName = ctx.callbackQuery?.game_short_name;
+    const data = ctx.callbackQuery?.data || "";
+    const gameName = ctx.callbackQuery?.game_short_name;
 
-      // When pressing a "Play" button from /games
-      if (data && data.startsWith("launch_")) {
+    // 🧠 Ignore non-game callbacks (like trivia, roles, etc.)
+    if (!(data.startsWith("launch_") || gameName)) {
+      return next();
+    }
+
+    try {
+      // 🎮 When pressing a "Play" button from /games list
+      if (data.startsWith("launch_")) {
         const key = data.replace("launch_", "");
         const game = GAMES[key];
         if (game) {
@@ -81,23 +86,37 @@ function setupGames(bot) {
         }
       }
 
-      // When user presses native game button
+      // 🕹️ When user presses the native game button
       const { contests } = require("../contests/contests");
 
-if (gameName && GAMES[gameName]) {
-  const chatId = ctx.chat?.id || ctx.from?.id;
-  const activeContest = contests.get(chatId);
-  let launchUrl = GAMES[gameName].url;
+      if (gameName && GAMES[gameName]) {
+        const chatId = ctx.chat?.id || ctx.from?.id;
+        const activeContest = contests.get(chatId);
+        let launchUrl = GAMES[gameName].url;
 
-  if (activeContest && activeContest.game === gameName) {
-    launchUrl += `?contest=${activeContest.key}`;
-    console.log(`🏁 Launching ${gameName} in CONTEST mode →`, launchUrl);
-  }
+        // ✅ Add contest query if active
+        if (activeContest && activeContest.game === gameName) {
+          launchUrl += `?contest=${activeContest.key}`;
+          console.log(`🏁 Launching ${gameName} in CONTEST mode →`, launchUrl);
+        }
 
-  await ctx.answerGameQuery(launchUrl);
-  return;
-}
+        // ✅ Include Telegram user info for PlayFab login
+        const userData = encodeURIComponent(
+          JSON.stringify({
+            id: ctx.from.id,
+            username: ctx.from.username,
+            first_name: ctx.from.first_name,
+          })
+        );
 
+        // Append to URL (keep existing params safe)
+        launchUrl += (launchUrl.includes("?") ? "&" : "?") + `user=${userData}`;
+
+        console.log(`🎮 Launch URL for ${gameName}: ${launchUrl}`);
+
+        await ctx.answerGameQuery(launchUrl);
+        return;
+      }
 
       return next();
     } catch (err) {
@@ -106,7 +125,7 @@ if (gameName && GAMES[gameName]) {
     }
   });
 
-  console.log("🎮 Games module loaded (Fixed Telegram Play buttons).");
+  console.log("🎮 Games module loaded (Enhanced Telegram Play buttons).");
 }
 
 module.exports = { setupGames };
