@@ -10,15 +10,12 @@ const { Markup } = require("telegraf");
 
 function setupGames(bot) {
   /**
-   * /games — show all games with native Play buttons
+   * /games — show all games with working Play buttons
    */
   bot.command("games", async (ctx) => {
     try {
       const keyboard = Object.entries(GAMES).map(([key, game]) => [
-        {
-          text: `🎮 Play ${game.title}`,
-          callback_game: {}, // 🧠 key change here
-        },
+        Markup.button.callback(`🎮 Play ${game.title}`, `play_${key}`),
       ]);
 
       const text =
@@ -31,9 +28,7 @@ function setupGames(bot) {
           )
           .join("\n\n");
 
-      await ctx.replyWithMarkdown(text, {
-        reply_markup: { inline_keyboard: keyboard },
-      });
+      await ctx.replyWithMarkdown(text, Markup.inlineKeyboard(keyboard));
     } catch (err) {
       console.error("⚠️ Failed to send games list:", err);
       await ctx.reply("⚠️ Could not load games list right now.");
@@ -61,16 +56,31 @@ function setupGames(bot) {
   });
 
   /**
-   * Unified callback handler — handles all native game launches
+   * Unified callback handler — handles /games buttons and native game launches
    */
   bot.on("callback_query", async (ctx, next) => {
     try {
+      const data = ctx.callbackQuery?.data;
       const gameName = ctx.callbackQuery?.game_short_name;
+
+      // 🎮 Handle buttons from /games (callback_data)
+      if (data && data.startsWith("play_")) {
+        const key = data.replace("play_", "");
+        const game = GAMES[key];
+        if (game) {
+          await ctx.answerGameQuery(game.url);
+          console.log(`🎮 Game launched from /games: ${game.title}`);
+          return;
+        }
+      }
+
+      // 🕹️ Handle native game_short_name launches (/flappycat etc)
       if (gameName && GAMES[gameName]) {
         await ctx.answerGameQuery(GAMES[gameName].url);
-        console.log(`🎮 Game launched: ${gameName}`);
+        console.log(`🎮 Native game launch: ${gameName}`);
         return;
       }
+
       return next();
     } catch (err) {
       console.error("🎮 Game callback error:", err);
@@ -78,7 +88,7 @@ function setupGames(bot) {
     }
   });
 
-  console.log("🎮 Games module loaded (Native Play buttons active).");
+  console.log("🎮 Games module loaded (Play buttons fixed and functional).");
 }
 
 module.exports = { setupGames };
