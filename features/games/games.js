@@ -19,5 +19,3 @@ exports.GAMES = {
     description: "Classic minesweeper — but with furballs.",
   },
 };
-
-module.exports = { GAMES };
