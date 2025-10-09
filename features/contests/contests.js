@@ -4,7 +4,8 @@
  * =====================================================
  */
 
-const { GAMES } = require("../games/index.js");
+const { GAMES } = require("../games/games.js");
+console.log("🎮 Loaded games in contests:", Object.keys(GAMES || {}));
 console.log("🎮 Contest Games Loaded:", GAMES);
 const { getLeaderboardCached, getStatName } = require("../leaderboard");
 const { isWhitelisted } = require("../../modules/safecat/protector");
