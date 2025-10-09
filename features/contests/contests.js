@@ -6,7 +6,10 @@
 
 const { GAMES } = require("../games");
 const { getLeaderboardCached, getStatName } = require("../leaderboard");
-const { isWhitelisted } = require("../../modules/safecat/protector"); // ✅ minimal import
+const { isWhitelisted } = require("../../modules/safecat/protector");
+
+// Debug check
+console.log("🧩 Contest whitelist import:", typeof isWhitelisted);
 
 const contests = new Map();
 
