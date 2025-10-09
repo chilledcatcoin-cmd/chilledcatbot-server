@@ -80,6 +80,8 @@ await ctx.reply(`🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minut
   parse_mode: "Markdown",
 });
 
+console.log(`📣 Contest started in chat ${ctx.chat.id} for ${game}`);
+
 // Step 2 — Send the actual Telegram Game Card
 await ctx.replyWithGame(game, {
   reply_markup: {
@@ -95,23 +97,31 @@ await ctx.replyWithGame(game, {
 }
 
 function scheduleUpdates(ctx, game, key, expires) {
+  const chatId = ctx.chat.id; // ✅ Capture chat ID
   const totalDuration = expires - Date.now();
   const interval = totalDuration / 4;
+  const bot = ctx.telegram; // ✅ Safe reference for sending later
 
   for (let i = 1; i <= 4; i++) {
     setTimeout(async () => {
-      const c = contests.get(ctx.chat.id);
+      const c = contests.get(chatId);
       if (!c || c.key !== key || Date.now() > c.expires) return;
 
-      const list = await getLeaderboardCached(getStatName("contest", game, key));
-      const timeRemaining = c.expires - Date.now();
-      const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
-      ctx.reply(msg, { parse_mode: "Markdown" });
+      try {
+        const list = await getLeaderboardCached(getStatName("contest", game, key));
+        const timeRemaining = c.expires - Date.now();
+        const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
+        await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+      } catch (err) {
+        console.error("⚠️ Failed to send contest update:", err);
+      }
     }, interval * i);
   }
 
-  setTimeout(() => endContest(ctx, game, true), totalDuration);
+  // ✅ End contest cleanly using bot reference
+  setTimeout(() => endContest({ telegram: bot, chat: { id: chatId } }, game, true), totalDuration);
 }
+
 
 async function endContest(ctx, game, auto = false) {
   const c = contests.get(ctx.chat.id);
@@ -124,7 +134,8 @@ async function endContest(ctx, game, auto = false) {
 
   const list = await getLeaderboardCached(getStatName("contest", game, c.key));
   const msg = formatLeaderboard(game, list, true, null, c.groupTitle);
-  ctx.reply(msg, { parse_mode: "Markdown" });
+  ctx.telegram.sendMessage(ctx.chat.id, msg, { parse_mode: "Markdown" });
+
 }
 
 function setupContests(bot) {
