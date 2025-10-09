@@ -1,38 +1,44 @@
 /**
  * =====================================================
- *  ChilledCatBot - Games Module
- *  Shows available games with Play Now buttons
+ * ChilledCatBot - Games Module
+ * Sends native Telegram Game cards and handles launches
  * =====================================================
  */
 
-const { Markup } = require("telegraf");
 const { GAMES } = require("./games");
 
 function setupGames(bot) {
-  bot.command("games", async (ctx) => {
-    try {
-      const rows = Object.entries(GAMES).map(([key, game]) => [
-        Markup.button.url(
-          `🎮 Play ${game.title}`,
-          game.url || `https://chilledcatbot-server.onrender.com/games/${key}`
-        ),
-      ]);
-
-      await ctx.replyWithMarkdown(
-        "😺 *Available Chilled Cat Games:*\n" +
-          "Click below to play directly!\n\n" +
-          Object.values(GAMES)
-            .map((g) => `🎮 *${g.title}*\n${g.description || "No description."}`)
-            .join("\n\n"),
-        Markup.inlineKeyboard(rows)
-      );
-    } catch (err) {
-      console.error("⚠️ Failed to send games list:", err);
-      ctx.reply("⚠️ Could not load games list right now.");
-    }
+  // 📜 Register individual game commands
+  Object.entries(GAMES).forEach(([key, game]) => {
+    bot.command(key, async (ctx) => {
+      try {
+        await ctx.replyWithGame(key, {
+          reply_markup: {
+            inline_keyboard: [[{ text: `Play ${game.title} — A Chilled Cat Game`, callback_game: {} }]],
+          },
+        });
+      } catch (err) {
+        console.error(`⚠️ Failed to send game card for ${key}:`, err);
+        ctx.reply(`⚠️ Could not open ${game.title} right now.`);
+      }
+    });
   });
 
-  console.log("🎮 Games module loaded (popup links active).");
+  // 🧠 Callback queries (when user presses “Play”)
+  bot.on("callback_query", async (ctx, next) => {
+    const data = ctx.callbackQuery?.game_short_name;
+    if (data && GAMES[data]) {
+      try {
+        // Telegram expects this to open the game URL
+        return ctx.answerGameQuery(GAMES[data].url);
+      } catch (err) {
+        console.error("🎮 Game launch error:", err);
+      }
+    }
+    return next();
+  });
+
+  console.log("🎮 Games module loaded (Telegram Game Mode active).");
 }
 
 module.exports = { setupGames };

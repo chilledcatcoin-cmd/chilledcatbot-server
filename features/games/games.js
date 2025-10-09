@@ -1,18 +1,23 @@
 /**
  * =====================================================
- *  ChilledCatBot - Games List
+ * ChilledCatBot - Games - games.js
+ * Handles game launches via callback queries & /commands
+ * Version: 1.6.0
+ * Date: 2025-10-09
  * =====================================================
  */
 
-exports.GAMES = {
+const GAMES = {
   flappycat: {
     title: "Flappy Cat",
-    description: "Tap to keep the Chilled Cat airborne and dodge pipes!",
-    url: "https://chilledcatbot-server.onrender.com/flappycat",
+    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/flappycat/flappycat.html",
+    description: "Help Chilled Cat soar through pipes in this retro tribute to Flappy Bird!",
   },
   catsweeper: {
     title: "CatSweeper",
-    description: "Classic minesweeper, but fluffier. Don’t bonk the tuna cans!",
-    url: "https://chilledcatbot-server.onrender.com/catsweeper",
+    url: "https://chilledcatcoin-cmd.github.io/chilledcatbot/games/catsweeper/catsweeper.html",
+    description: "Classic minesweeper — but fluffier. Avoid the tuna bombs!",
   },
 };
+
+module.exports = { GAMES };
