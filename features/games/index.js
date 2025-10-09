@@ -14,9 +14,9 @@ function setupGames(bot) {
    */
   bot.command("games", async (ctx) => {
     try {
-      const keyboard = Object.entries(GAMES).map(([key, game]) => {
-        return [Markup.button.callback(`🎮 Play ${game.title}`, `play_${key}`)];
-      });
+      const keyboard = Object.entries(GAMES).map(([key, game]) => [
+        Markup.button.callback(`🎮 Play ${game.title}`, `play_${key}`)
+      ]);
 
       const text =
         "😺 *Chilled Cat Game Hub*\n\n" +
@@ -36,7 +36,7 @@ function setupGames(bot) {
   });
 
   /**
-   * Individual commands for each game
+   * /flappycat, /catsweeper — open native Telegram game cards
    */
   Object.entries(GAMES).forEach(([key, game]) => {
     bot.command(key, async (ctx) => {
@@ -46,7 +46,7 @@ function setupGames(bot) {
             inline_keyboard: [
               [
                 {
-                  text: `Play ${game.title} — A Chilled Cat Game`,
+                  text: `🎮 Play ${game.title}`,
                   callback_game: {},
                 },
               ],
@@ -61,23 +61,36 @@ function setupGames(bot) {
   });
 
   /**
-   * Callback handler for inline "Play" buttons from /games
+   * Unified callback handler — handles both play_ buttons and native game launches
    */
   bot.on("callback_query", async (ctx, next) => {
-    const data = ctx.callbackQuery?.data;
-    if (data && data.startsWith("play_")) {
-      const key = data.replace("play_", "");
-      const game = GAMES[key];
-      if (game) {
-        try {
+    try {
+      const data = ctx.callbackQuery?.data;
+      const gameName = ctx.callbackQuery?.game_short_name;
+
+      // 🎮 Handle inline "Play" buttons from /games
+      if (data && data.startsWith("play_")) {
+        const key = data.replace("play_", "");
+        const game = GAMES[key];
+        if (game) {
           await ctx.answerGameQuery(game.url);
+          console.log(`🎮 Inline game launch: ${game.title}`);
           return;
-        } catch (err) {
-          console.error("🎮 Game launch error:", err);
         }
       }
+
+      // 🕹️ Handle native Telegram game launch buttons (from /flappycat etc)
+      if (gameName && GAMES[gameName]) {
+        await ctx.answerGameQuery(GAMES[gameName].url);
+        console.log(`🎮 Native game launch: ${gameName}`);
+        return;
+      }
+
+      return next();
+    } catch (err) {
+      console.error("🎮 Game callback error:", err);
+      return next();
     }
-    return next();
   });
 
   console.log("🎮 Games module loaded (Dynamic Chilled Cat Game Hub active).");
