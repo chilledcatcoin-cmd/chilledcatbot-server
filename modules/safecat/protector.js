@@ -172,6 +172,10 @@ bot.command("whois", async (ctx) => {
 });
 
   console.log("🛡️ SafeCat Protector active.");
+
+function isWhitelisted(userId) {
+  loadWhitelist();
+  return whitelist.users.map(String).includes(userId.toString());
 }
 
-module.exports = { setupProtector };
+module.exports = { setupProtector, isWhitelisted };
