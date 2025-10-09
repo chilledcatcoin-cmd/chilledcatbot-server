@@ -44,10 +44,10 @@
  * =====================================================
  */
 
-const { GAMES } = require("../games/games");
-const { getLeaderboardCached } = require("../games/leaderboard");
-const { contests } = require("../contests/contests");
-const { isWhitelisted } = require("../safecat/protector");
+const { GAMES } = require("./features/games/");
+const { getLeaderboardCached } = require("./features/leaderboard/
+const { contests } = require("./features/contests/");
+const { isWhitelisted } = require("./modules/safecat/");
 
 async function setupCommands(bot) {
   // 🎮 Welcome & Help
