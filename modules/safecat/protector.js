@@ -70,6 +70,9 @@ function setupProtector(bot) {
   // 🔒 Auto-leave unauthorized groups
   bot.use(async (ctx, next) => {
     if (!ctx.chat) return next();
+
+    loadWhitelist();
+
     const chatId = ctx.chat.id.toString();
 
     if (ctx.chat.type === "private") return next();
