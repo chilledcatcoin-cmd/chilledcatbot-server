@@ -111,10 +111,17 @@ async function endContest(ctx, game, auto = false) {
 }
 
 function setupContests(bot) {
-  bot.command("startcontest", async (ctx) => {
-    const [_, game, minutes] = ctx.message.text.split(" ");
-    await startContest(ctx, game, parseInt(minutes) || 10);
-  });
+bot.command("startcontest", async (ctx) => {
+  const parts = ctx.message.text.split(" ").filter(Boolean);
+  const game = parts[1]?.replace(/^@.*bot$/i, "") || parts[2]; // skip @bot username if present
+  const minutes = parseInt(parts[2]) || 10;
+
+  if (!game) {
+    return ctx.reply("Usage: /startcontest <game> [minutes]");
+  }
+
+  await startContest(ctx, game.toLowerCase(), minutes);
+});
 
   bot.command("endcontest", async (ctx) => {
     const [_, game] = ctx.message.text.split(" ");
