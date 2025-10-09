@@ -5,7 +5,7 @@
  */
 
 const { GAMES } = require("../games/games.js");
-cconst { getLeaderboardCached, getStatName } = require("../leaderboard/leaderboard.js");
+const { getLeaderboardCached, getStatName } = require("../leaderboard/leaderboard.js");
 const { isWhitelisted } = require("../../modules/safecat/protector");
 
 const contests = new Map();
