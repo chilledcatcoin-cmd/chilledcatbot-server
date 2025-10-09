@@ -87,34 +87,33 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
    ------------------------------- */
 async function endContest(ctxOrBot, game = "flappycat", auto = false) {
   const chatId = ctxOrBot.chat?.id || ctxOrBot.chatId;
-  const bot = ctxOrBot.telegram || ctxOrBot.bot || ctxOrBot; // still resolves to Telegram API
+  const telegram = ctxOrBot.telegram || ctxOrBot.bot?.telegram || ctxOrBot; // ✅ Safe
 
   const c = contests.get(chatId);
   if (!c || c.game !== game) {
-    return bot.sendMessage(chatId, "⚠️ No active contest found.");
+    return telegram.sendMessage(chatId, "⚠️ No active contest found.");
   }
 
   contests.delete(chatId);
 
-try {
-  const list = await getLeaderboardCached(getStatName("contest", game, c.key));
-  let msg;
+  try {
+    const list = await getLeaderboardCached(getStatName("contest", game, c.key));
+    let msg;
 
-  if (!list || list.length === 0) {
-    msg =
-      `🏁 *${GAMES[game].title}* Contest Ended!\n\n` +
-      `📍 _${c.groupTitle}_\n\n` +
-      "No one scored this round — it’s okay, we’re all still chilling 😺";
-  } else {
-    msg = formatLeaderboard(game, list, true, null, c.groupTitle);
+    if (!list || list.length === 0) {
+      msg =
+        `🏁 *${GAMES[game].title}* Contest Ended!\n\n` +
+        `📍 _${c.groupTitle}_\n\n` +
+        "No one scored this round — it’s okay, we’re all still chilling 😺";
+    } else {
+      msg = formatLeaderboard(game, list, true, null, c.groupTitle);
+    }
+
+    await telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+    console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
+  } catch (err) {
+    console.error("⚠️ Failed to send contest end message:", err);
   }
-
-  await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
-  console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
-} catch (err) {
-  console.error("⚠️ Failed to send contest end message:", err);
-}
-
 }
 
 /* -------------------------------
@@ -123,36 +122,33 @@ try {
 function scheduleUpdates(bot, chatId, game, key, expires) {
   const totalDuration = expires - Date.now();
   const interval = totalDuration / 4;
+  const telegram = bot.telegram || bot; // ✅ ensure Telegram API object
 
   for (let i = 1; i <= 4; i++) {
-setTimeout(async () => {
-  const c = contests.get(chatId);
-  if (!c || c.key !== key) return;
+    setTimeout(async () => {
+      const c = contests.get(chatId);
+      if (!c || c.key !== key) return;
 
-  const now = Date.now();
-  const timeRemaining = c.expires - now;
+      const now = Date.now();
+      const timeRemaining = c.expires - now;
 
-  // 🧱 If contest expired, end it cleanly and stop updates
-  if (timeRemaining <= 0) {
-    await endContest({ bot, chatId }, game, true);
-    return;
+      // ⏳ If contest expired, skip (main timer will handle end)
+      if (timeRemaining <= 0) return;
+
+      try {
+        const list = await getLeaderboardCached(getStatName("contest", game, key));
+        const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
+        await telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+        console.log(`📢 Sent contest update ${i}/4 to chat ${chatId}`);
+      } catch (err) {
+        console.error("⚠️ Failed to send contest update:", err);
+      }
+    }, interval * i);
   }
 
-  try {
-    const list = await getLeaderboardCached(getStatName("contest", game, key));
-    const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
-    await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
-    console.log(`📢 Sent contest update ${i}/4 to chat ${chatId}`);
-  } catch (err) {
-    console.error("⚠️ Failed to send contest update:", err);
-  }
-}, interval * i);
-
-  }
-
-  // End contest automatically
+  // 🏁 End contest automatically
   setTimeout(async () => {
-    await endContest({ bot, chatId }, game, true);
+    await endContest({ telegram, chatId }, game, true);
   }, totalDuration);
 }
 
