@@ -96,14 +96,25 @@ async function endContest(ctxOrBot, game = "flappycat", auto = false) {
 
   contests.delete(chatId);
 
-  try {
-    const list = await getLeaderboardCached(getStatName("contest", game, c.key), true);
-    const msg = formatLeaderboard(game, list, true, null, c.groupTitle);
-    await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
-    console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
-  } catch (err) {
-    console.error("⚠️ Failed to send contest end message:", err);
+try {
+  const list = await getLeaderboardCached(getStatName("contest", game, c.key));
+  let msg;
+
+  if (!list || list.length === 0) {
+    msg =
+      `🏁 *${GAMES[game].title}* Contest Ended!\n\n` +
+      `📍 _${c.groupTitle}_\n\n` +
+      "No one scored this round — it’s okay, we’re all still chilling 😺";
+  } else {
+    msg = formatLeaderboard(game, list, true, null, c.groupTitle);
   }
+
+  await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+  console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
+} catch (err) {
+  console.error("⚠️ Failed to send contest end message:", err);
+}
+
 }
 
 /* -------------------------------
