@@ -45,7 +45,6 @@
  */
 
 const { GAMES } = require("./features/games");
-const { contests } = require("./features/contests");
 const { getLeaderboardCached } = require("./features/leaderboard");
 const { contests } = require("./features/contests");
 const { isWhitelisted } = require("./modules/safecat/protector");
