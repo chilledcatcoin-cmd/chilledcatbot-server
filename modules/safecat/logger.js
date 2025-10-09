@@ -10,8 +10,8 @@
  * `-'`-'     / (_{;}_)|   | |   |   |        \|        \\       / |       .'  
  *   `._____.'  '(_,_) '---' '---'   `--------``--------` `'-..-'  '-----'`    
  *                                                                           
- *                   +=*          ***	    _______      ____   ,---------. 			              
- *                  *:::*        *=.:*	   /   __  \   .'  __ `.\          \	             
+ *                   +=*          ***	      _______      ____   ,---------. 			              
+ *                  *:::*        *=.:*	     /   __  \   .'  __ `.\          \	             
  *                 *.::::+      *:.:::*     | ,_/  \__) /   '  \  \`--.  ,---'         
  *                 +....+*++**++::::::=*  ,-./  )       |___|  /  |   |   \       
  *               *+++=:.:::::.:..:.::::*  \  '_ '`)        _.-`   |   :_ _:            
@@ -74,6 +74,24 @@ function setupLogger(bot) {
   loadConfig();
   const logChatId = process.env.LOG_CHAT_ID;
   if (!logChatId) console.warn("⚠️ SafeCat: LOG_CHAT_ID not set — console-only logs.");
+
+  // 🛡️ Global safety wrapper — always first
+  bot.use(async (ctx, next) => {
+    try {
+      await next();
+    } catch (err) {
+      console.error("🔥 Unhandled error:", err);
+      if (process.env.LOG_CHAT_ID) {
+        try {
+          await bot.telegram.sendMessage(
+            process.env.LOG_CHAT_ID,
+            `🔥 Unhandled error:\n${err.message}`
+          );
+        } catch {}
+      }
+    }
+  });
+
 
   function log(msg) {
     console.log("🪶", msg);
