@@ -65,7 +65,10 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
     const webhookEndpoint = `${WEBHOOK_URL}${webhookPath}`;
 
     console.log("🌐 Setting Telegram webhook to:", webhookEndpoint);
-    await bot.telegram.setWebhook(webhookEndpoint);
+      await bot.telegram.setWebhook(webhookEndpoint, {
+      allowed_updates: ["message", "callback_query", "chat_member", "my_chat_member"]
+    });
+
 
     // Bind Telegram webhook to Express
     app.use(bot.webhookCallback(webhookPath));
