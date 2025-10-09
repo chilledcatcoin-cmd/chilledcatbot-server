@@ -66,12 +66,12 @@ const bot = new Telegraf(BOT_TOKEN);
 bot.start((ctx) => ctx.reply("😺 ChilledCatBot is alive and ready to chill!"));
 
 // 🧊 Load first feature
+setupSafeCat(bot);
 setupCommands(bot);
 setupHowChill(bot);
 setupFortune(bot);
 setupBattleRoyale(bot);
 setupDuelFeature(bot);
-setupSafeCat(bot);
 setupGames(bot);
 setupLeaderboard(bot);
 setupContests(bot);
