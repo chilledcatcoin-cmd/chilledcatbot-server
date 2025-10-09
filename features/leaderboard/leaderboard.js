@@ -22,7 +22,8 @@ function getStatName(type, game, id = "") {
     case "group":
       return `${game}_group_${id}`;
     case "contest":
-      return `${game}_contest_${id}`;
+      // 🧠 Fix: if the ID already contains "contest_", return it directly
+      return id && id.includes("contest_") ? id : `${game}_contest_${id}`;
     default:
       return `${game}_${type}`;
   }
