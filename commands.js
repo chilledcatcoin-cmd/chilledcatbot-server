@@ -130,10 +130,6 @@ async function setupCommands(bot) {
           { command: "brjoin", description: "Join the battle" },
           { command: "brleave", description: "Leave the battle" },
           { command: "brstatus", description: "Check current status" },
-          { command: "startcontest flappycat", description: "Start a contest (admin)" },
-          { command: "startcontest catsweeper", description: "Start a contest (admin)" },
-          { command: "endcontest flappycat", description: "End the current contest (admin)" },
-          { command: "endcontest catsweeper", description: "End the current contest (admin)" },
         ],
         { scope: { type: "all_group_chats" } }
       ),
