@@ -172,6 +172,7 @@ bot.command("whois", async (ctx) => {
 });
 
   console.log("🛡️ SafeCat Protector active.");
+}
 
 function isWhitelisted(userId) {
   loadWhitelist();
