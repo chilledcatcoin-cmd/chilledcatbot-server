@@ -116,31 +116,60 @@ function setupProtector(bot) {
     );
   });
 
-  // 👑 /whois
-  bot.command("whois", async (ctx) => {
-    if (!isAdmin(ctx)) return ctx.reply("🚫 Unauthorized.");
+bot.command("whois", async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply("🚫 Unauthorized.");
 
-    let target = null;
-    if (ctx.message.reply_to_message)
-      target = ctx.message.reply_to_message.from.id.toString();
-    else {
-      const args = ctx.message.text.split(" ").slice(1);
-      if (!args.length)
-        return ctx.reply("❓ Usage: reply to a message with /whois OR /whois <id | @username>");
-      target = args[0].trim();
-    }
+  const args = ctx.message.text.split(" ").slice(1);
+  let target = null;
 
-    try {
-      const chat = await bot.telegram.getChat(target);
-      await ctx.reply(
-        `👤 User Info:\n🆔 ${chat.id}\n📛 ${chat.first_name || ""} ${chat.last_name || ""}\n🔗 ${
-          chat.username ? "@" + chat.username : "(none)"
-        }\n👥 Type: ${chat.type}`
-      );
-    } catch {
-      await ctx.reply(`❌ Could not fetch info for ${target}`);
+  // 🧱 Case 1: reply to a message
+  if (ctx.message.reply_to_message) {
+    target = ctx.message.reply_to_message.from.id;
+  }
+  // 🧱 Case 2: argument provided
+  else if (args.length) {
+    const input = args[0].trim();
+
+    // Numeric ID (user or chat)
+    if (/^-?\d+$/.test(input)) {
+      target = parseInt(input);
     }
-  });
+    // Username (user, group, or channel)
+    else if (input.startsWith("@")) {
+      try {
+        const chat = await bot.telegram.getChat(input);
+        target = chat.id;
+      } catch (err) {
+        console.error("❌ Username lookup failed:", err.message);
+        return ctx.reply(`❌ Could not fetch info for ${input}`);
+      }
+    } else {
+      return ctx.reply("❓ Usage: /whois <@username | id> or reply to a user");
+    }
+  } else {
+    return ctx.reply("❓ Usage: /whois <@username | id> or reply to a user");
+  }
+
+  try {
+    const chat = await bot.telegram.getChat(target);
+
+    let info = `👤 Info:\n`;
+    info += `🆔 <code>${chat.id}</code>\n`;
+    info += `📛 ${chat.title || chat.first_name || "(no name)"}\n`;
+    if (chat.username) info += `🔗 @${chat.username}\n`;
+    info += `👥 Type: ${chat.type}`;
+
+    // Optional extras
+    if (chat.bio) info += `\n💬 Bio: ${chat.bio}`;
+    if (chat.description) info += `\n📝 Description: ${chat.description}`;
+    if (chat.members_count) info += `\n👥 Members: ${chat.members_count}`;
+
+    await ctx.replyWithHTML(info);
+  } catch (err) {
+    console.error("❌ WHOIS error:", err.message);
+    await ctx.reply(`❌ Could not fetch info for ${target}`);
+  }
+});
 
   console.log("🛡️ SafeCat Protector active.");
 }
