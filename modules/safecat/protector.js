@@ -46,7 +46,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const whitelistPath = path.join(__dirname, "../../config/whitelist.json");
+const whitelistPath = path.join(__dirname, "./config/whitelist.json");
 let whitelist = { groups: [], users: [] };
 
 function loadWhitelist() {
