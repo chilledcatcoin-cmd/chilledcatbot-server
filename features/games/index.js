@@ -92,8 +92,6 @@ if (gameName && GAMES[gameName]) {
   if (activeContest && activeContest.game === gameName) {
     launchUrl += `?contest=${activeContest.key}`;
     console.log(`🏁 Launching ${gameName} in CONTEST mode →`, launchUrl);
-  } else {
-    console.log(`🎮 Launching ${gameName} globally →`, launchUrl);
   }
 
   await ctx.answerGameQuery(launchUrl);
