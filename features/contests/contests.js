@@ -63,7 +63,7 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
   contests.set(ctx.chat.id, { game, key, expires, groupTitle });
   console.log(`📣 Contest started in chat ${ctx.chat.id} for ${game}`);
 
-  const bot = ctx.telegram;
+  const bot = ctx.telegram; // <-- direct Telegram API object
   const gameUrl = `${gameInfo.url}?contest=${key}`;
 
   await bot.sendMessage(
@@ -87,13 +87,11 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
    ------------------------------- */
 async function endContest(ctxOrBot, game = "flappycat", auto = false) {
   const chatId = ctxOrBot.chat?.id || ctxOrBot.chatId;
-  const bot = ctxOrBot.telegram || ctxOrBot.bot || ctxOrBot;
+  const bot = ctxOrBot.telegram || ctxOrBot.bot || ctxOrBot; // still resolves to Telegram API
 
   const c = contests.get(chatId);
   if (!c || c.game !== game) {
-    return bot.telegram
-      ? bot.telegram.sendMessage(chatId, "⚠️ No active contest found.")
-      : console.warn("⚠️ Tried to end a non-existent contest:", chatId);
+    return bot.sendMessage(chatId, "⚠️ No active contest found.");
   }
 
   contests.delete(chatId);
@@ -101,7 +99,7 @@ async function endContest(ctxOrBot, game = "flappycat", auto = false) {
   try {
     const list = await getLeaderboardCached(getStatName("contest", game, c.key));
     const msg = formatLeaderboard(game, list, true, null, c.groupTitle);
-    await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+    await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
     console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
   } catch (err) {
     console.error("⚠️ Failed to send contest end message:", err);
@@ -124,7 +122,7 @@ function scheduleUpdates(bot, chatId, game, key, expires) {
         const list = await getLeaderboardCached(getStatName("contest", game, key));
         const timeRemaining = c.expires - Date.now();
         const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
-        await bot.telegram.sendMessage(chatId, msg, { parse_mode: "Markdown" });
+        await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" }); // ✅ FIXED
         console.log(`📢 Sent contest update ${i}/4 to chat ${chatId}`);
       } catch (err) {
         console.error("⚠️ Failed to send contest update:", err);
