@@ -97,7 +97,7 @@ async function endContest(ctxOrBot, game = "flappycat", auto = false) {
   contests.delete(chatId);
 
   try {
-    const list = await getLeaderboardCached(getStatName("contest", game, c.key));
+    const list = await getLeaderboardCached(getStatName("contest", game, key), true);
     const msg = formatLeaderboard(game, list, true, null, c.groupTitle);
     await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
     console.log(`🏁 Contest ended for ${game} in chat ${chatId}`);
@@ -119,7 +119,7 @@ function scheduleUpdates(bot, chatId, game, key, expires) {
       if (!c || c.key !== key || Date.now() > c.expires) return;
 
       try {
-        const list = await getLeaderboardCached(getStatName("contest", game, key));
+        const list = await getLeaderboardCached(getStatName("contest", game, key), true);
         const timeRemaining = c.expires - Date.now();
         const msg = formatLeaderboard(game, list, false, timeRemaining, c.groupTitle);
         await bot.sendMessage(chatId, msg, { parse_mode: "Markdown" }); // ✅ FIXED

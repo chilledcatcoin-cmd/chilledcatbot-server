@@ -32,9 +32,9 @@ function getStatName(type, game, id = "") {
 /* -------------------------------
    Fetch Leaderboard (Cached)
    ------------------------------- */
-async function getLeaderboardCached(statName) {
+async function getLeaderboardCached(statName, forceRefresh = false) {
   const cached = cache.get(statName);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+  if (cached && !forceRefresh && (Date.now() - cached.ts < CACHE_TTL)) {
     return cached.data;
   }
 
@@ -52,6 +52,7 @@ async function getLeaderboardCached(statName) {
   cache.set(statName, { ts: Date.now(), data: list });
   return list;
 }
+
 
 /* -------------------------------
    Record Player Score
