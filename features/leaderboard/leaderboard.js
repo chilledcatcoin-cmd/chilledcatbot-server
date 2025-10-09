@@ -12,18 +12,28 @@ const CACHE_TTL = 30000; // 30 seconds
 
 const cache = new Map();
 
+/* -------------------------------
+   Utility: Get Stat Name
+   ------------------------------- */
 function getStatName(type, game, id = "") {
   switch (type) {
-    case "global": return `${game}_global`;
-    case "group":  return `${game}_group_${id}`;
-    case "contest": return `${game}_contest_${id}`;
-    default: return `${game}_${type}`;
+    case "global":
+      return `${game}_global`;
+    case "group":
+      return `${game}_group_${id}`;
+    case "contest":
+      return `${game}_contest_${id}`;
+    default:
+      return `${game}_${type}`;
   }
 }
 
+/* -------------------------------
+   Fetch Leaderboard (Cached)
+   ------------------------------- */
 async function getLeaderboardCached(statName) {
   const cached = cache.get(statName);
-  if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
     return cached.data;
   }
 
@@ -42,4 +52,31 @@ async function getLeaderboardCached(statName) {
   return list;
 }
 
-module.exports = { getLeaderboardCached, getStatName };
+/* -------------------------------
+   Record Player Score
+   ------------------------------- */
+async function recordScore(user, game, score, type = "global", id = "") {
+  try {
+    const statName = getStatName(type, game, id);
+    const displayName = user.first_name || user.username || "Anonymous";
+
+    await axios.post(
+      `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Server/UpdatePlayerStatistics`,
+      {
+        PlayFabId: user.playFabId, // should be set when user logs in / links
+        Statistics: [{ StatisticName: statName, Value: score }],
+      },
+      { headers: { "X-SecretKey": PLAYFAB_DEV_SECRET } }
+    );
+
+    console.log(`💾 Saved ${displayName}'s ${game} score: ${score} (${statName})`);
+  } catch (err) {
+    console.error("⚠️ Failed to record score:", err?.response?.data || err);
+  }
+}
+
+/* -------------------------------
+   Exports
+   ------------------------------- */
+module.exports = { getLeaderboardCached, getStatName, recordScore };
+

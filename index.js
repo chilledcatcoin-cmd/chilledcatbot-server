@@ -50,6 +50,43 @@ require("dotenv").config();
 const express = require("express");
 const { bot } = require("./bot");
 
+// =====================================================
+// 🎮 Global Callback Handler — Game Score Integration
+// =====================================================
+const { contests } = require("./features/contests/contests");
+const { recordScore } = require("./features/leaderboard/leaderboard");
+
+// Handles all callback queries (button presses, game results, etc.)
+bot.on("callback_query", async (ctx) => {
+  try {
+    const data = ctx.callbackQuery?.data || "";
+    const from = ctx.from;
+    const chatId = ctx.chat?.id;
+
+    // Example: "score_flappycat_123"
+    if (data.startsWith("score_")) {
+      const [, game, scoreStr] = data.split("_");
+      const score = parseInt(scoreStr);
+
+      // Check if a contest is active in this chat
+      const contest = contests.get(chatId);
+      if (contest && contest.game === game && Date.now() < contest.expires) {
+        await recordScore(from, game, score, "contest", chatId);
+        console.log(`🏅 Recorded ${from.first_name}'s ${game} contest score: ${score}`);
+      } else {
+        // Otherwise treat as a normal score (global)
+        await recordScore(from, game, score, "global");
+        console.log(`🌍 Recorded ${from.first_name}'s ${game} global score: ${score}`);
+      }
+    }
+
+    await ctx.answerCbQuery();
+  } catch (err) {
+    console.error("⚠️ Error handling callback_query:", err);
+  }
+});
+
+
 const app = express();
 app.use(express.json());
 
