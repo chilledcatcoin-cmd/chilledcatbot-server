@@ -176,7 +176,13 @@ bot.command("whois", async (ctx) => {
 
 function isWhitelisted(userId) {
   loadWhitelist();
-  return whitelist.users.map(String).includes(userId.toString());
+  return (
+    whitelist.users.map(String).includes(userId.toString()) ||
+    whitelist.groups.map(String).includes(userId.toString())
+  );
 }
 
-module.exports = { setupProtector, isWhitelisted };
+module.exports = {
+  setupProtector,
+  isWhitelisted,
+};
