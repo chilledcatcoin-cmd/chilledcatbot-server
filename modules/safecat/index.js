@@ -34,7 +34,7 @@
  *        **.....+:-+*:.:+::::**:-=::+.....+:*     
  *
  * =====================================================
- * ChilledCatBot - How Chill Connector File - index.js
+ * ChilledCatBot - Safecat Index - index.js
  *
  * Version: 1.0.0
  * Date: 2025-10-08

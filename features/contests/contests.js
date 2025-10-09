@@ -1,12 +1,12 @@
 /**
  * =====================================================
- * ChilledCatBot - Contest System
+ * ChilledCatBot - Contest System - contests.js
  * =====================================================
  */
 
 const { GAMES } = require("../games");
 const { getLeaderboardCached, getStatName } = require("../leaderboard");
-const { isWhitelisted } = require("../../modules/safecat/protector");
+const { isWhitelisted } = require("../../modules/safecat/protector"); // ✅ minimal import
 
 const contests = new Map();
 
@@ -22,7 +22,10 @@ function formatLeaderboard(game, list, final = false, timeRemaining = null, grou
 
   if (!list.length) return msg + "_(No scores yet)_";
 
-  list.forEach((entry, i) => {
+  // ✅ Limit to top 5
+  const topList = list.slice(0, 5);
+
+  topList.forEach((entry, i) => {
     const name = entry.DisplayName || `Player${i + 1}`;
     const value = entry.StatValue || 0;
     let line = `${i + 1}. ${name} — ${value}`;
@@ -46,6 +49,11 @@ function formatLeaderboard(game, list, final = false, timeRemaining = null, grou
 }
 
 async function startContest(ctx, game, minutes = 10) {
+  // ✅ Whitelist check (simple and early)
+  if (!isWhitelisted(ctx.from.id)) {
+    return ctx.reply("🚫 You are not whitelisted to start contests.");
+  }
+
   if (!GAMES[game]) {
     return ctx.reply("⚠️ Unknown game. Try one of: " + Object.keys(GAMES).join(", "));
   }
