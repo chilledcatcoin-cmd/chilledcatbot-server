@@ -45,6 +45,7 @@
  */
 
 const { GAMES } = require("./features/games");
+const { contests } = require("./features/contests");
 const { getLeaderboardCached } = require("./features/leaderboard");
 const { contests } = require("./features/contests");
 const { isWhitelisted } = require("./modules/safecat/protector");
@@ -105,16 +106,6 @@ async function setupCommands(bot) {
     }
   });
 
-  // 🧩 Contests (SafeCat protected)
-  bot.command("startcontest", async (ctx) => {
-    if (!isWhitelisted(ctx.from.id))
-      return ctx.reply("🚫 You’re not authorized to start contests.");
-    const c = contests.get(ctx.chat.id);
-    if (c) return ctx.reply("⚠️ A contest is already active.");
-    // start logic is handled in contests.js
-    ctx.reply("🎯 Contest starting soon...");
-  });
-
   // 📜 Telegram command menus
   try {
     await Promise.all([
@@ -140,8 +131,10 @@ async function setupCommands(bot) {
           { command: "brjoin", description: "Join the battle" },
           { command: "brleave", description: "Leave the battle" },
           { command: "brstatus", description: "Check current status" },
-          { command: "startcontest", description: "Start a contest (admin)" },
-          { command: "endcontest", description: "End the current contest" },
+          { command: "startcontest flappycat", description: "Start a contest (admin)" },
+          { command: "startcontest catsweeper", description: "Start a contest (admin)" },
+          { command: "endcontest flappycat", description: "End the current contest (admin)" },
+          { command: "endcontest catsweeper", description: "End the current contest (admin)" },
         ],
         { scope: { type: "all_group_chats" } }
       ),
