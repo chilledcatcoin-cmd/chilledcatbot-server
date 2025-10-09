@@ -72,22 +72,26 @@ async function startContest(ctx, game, minutes = 10) {
   // ✅ Define gameInfo before using it
   const gameInfo = GAMES[game];
 
-  await ctx.reply(
-    `🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.`,
-    {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: `🎮 Play ${gameInfo.title}`,
-              url: gameInfo.url,
-            },
-          ],
+// Construct the game URL with contest key
+const gameUrl = `${gameInfo.url}?contest=${key}`;
+
+await ctx.reply(
+  `🎉 Contest started for *${gameInfo.title}*!\nRuns for ${minutes} minutes.`,
+  {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: `🎮 Play ${gameInfo.title}`,
+            url: gameUrl,
+          },
         ],
-      },
-    }
-  );
+      ],
+    },
+  }
+);
+
 
   scheduleUpdates(ctx, game, key, expires);
 }
