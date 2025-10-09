@@ -4,7 +4,7 @@
  * =====================================================
  */
 
-const { GAMES } = require("../features/games");
+const { GAMES } = require("../../features/games");
 const { getLeaderboardCached, getStatName } = require("../leaderboard");
 const { isWhitelisted } = require("../../modules/safecat/protector");
 
