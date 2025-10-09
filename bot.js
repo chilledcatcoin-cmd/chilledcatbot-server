@@ -53,6 +53,9 @@ const { setupFortune } = require("./features/fortune");
 const { setupBattleRoyale } = require("./features/battleroyale");
 const { setupDuelFeature } = require("./features/duel");
 // const { setupSafeCat } = require("./modules/safecat");
+// const { setupGames } = require("./features/games");
+// const { setupLeaderboard } = require("./features/leaderboard");
+// const { setupContests } = require("./features/contests");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
@@ -69,6 +72,9 @@ setupFortune(bot);
 setupBattleRoyale(bot);
 setupDuelFeature(bot);
 // setupSafeCat(bot);
+// setupGames(bot);
+// setupLeaderboard(bot);
+// setupContests(bot);
 
 console.log("✅ Commands, HowChill, Fortune, and Battle Royale loaded.");
 
