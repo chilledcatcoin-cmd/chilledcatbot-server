@@ -64,7 +64,7 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
   console.log(`📣 Contest started in chat ${ctx.chat.id} for ${game}`);
 
   const bot = ctx.telegram; // <-- direct Telegram API object
-  const gameUrl = `${gameInfo.url}?contest=${key}`;
+  const gameUrl = `${gameInfo.url}?contest=${key}&end=${expires}`;
 
   await bot.sendMessage(
     ctx.chat.id,
