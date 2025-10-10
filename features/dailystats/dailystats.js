@@ -11,8 +11,6 @@
 
 const axios = require("axios");
 const Redis = require("ioredis");
-const { Telegraf } = require("telegraf");
-const api = new Telegraf(process.env.BOT_TOKEN);
 
 /* ------------------- Redis Client ------------------- */
 const redis = new Redis(process.env.REDIS_URL, {
@@ -81,10 +79,17 @@ async function getXData() {
   return { followers: data.data.public_metrics.followers_count };
 }
 
-// ✅ fixed Telegram data fetcher
+// ✅ Webhook-safe Telegram data fetcher (using raw Telegram API)
 async function getTelegramData() {
-  const members = await api.telegram.getChatMemberCount(CHANNEL_ID);
-  return { telegramMembers: members };
+  try {
+    const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${CHANNEL_ID}`;
+    const { data } = await axios.get(url);
+    if (!data.ok) throw new Error("Telegram API error");
+    return { telegramMembers: data.result };
+  } catch (err) {
+    console.warn("⚠️ Telegram member fetch failed:", err.message);
+    return { telegramMembers: 0 };
+  }
 }
 
 /* ------------------- Redis Helpers ------------------- */
