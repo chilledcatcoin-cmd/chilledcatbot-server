@@ -8,7 +8,7 @@
  */
 
 const cron = require("node-cron");
-const { postHourlyStats } = require(".features/dailystats");
+const { postHourlyStats } = require("./dailystats");
 
 function initHourlyStats(bot) {
   // 🕒 Auto-post every hour
