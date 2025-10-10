@@ -2,63 +2,42 @@ const { createCanvas, loadImage } = require("canvas");
 const path = require("path");
 const fs = require("fs");
 
+/**
+ * =====================================================
+ * Chilled Cat Stats Card (Dark Mode)
+ * =====================================================
+ * - Retro-futuristic vaporwave color palette
+ * - High contrast for Telegram preview
+ * =====================================================
+ */
+
 async function generateStatsCard(data) {
   const width = 800;
   const height = 600;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  /* ===============================
-     🪟 WINDOW FRAME STYLE
-     =============================== */
-
-  // Gray background
-  ctx.fillStyle = "#c0c0c0";
+  /* -------------------------------
+     🌌 Background gradient
+     ------------------------------- */
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, "#0a0f1f");   // deep space navy
+  gradient.addColorStop(0.5, "#1c1b33"); // midnight violet
+  gradient.addColorStop(1, "#24243e");   // soft indigo
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  // Outer border (3D effect)
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(10, 10, width - 20, height - 20);
-
-  // Inner white inset
-  ctx.strokeStyle = "#ffffff";
-  ctx.strokeRect(12, 12, width - 24, height - 24);
-
-  // Title bar
-  ctx.fillStyle = "#000080";
-  ctx.fillRect(12, 12, width - 24, 36);
-
-  // Title text
-  ctx.font = "bold 18px 'Arial'";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("😺 Chilled Cat Stats — Windows RC Edition", 28, 36);
-
-  // Control buttons (minimize, maximize, close)
-  const btnX = width - 24 - 60;
-  const btnY = 18;
-  const btnW = 16;
-  const spacing = 22;
-  ctx.fillStyle = "#c0c0c0";
-  for (let i = 0; i < 3; i++) {
-    ctx.fillRect(btnX + i * spacing, btnY, btnW, btnW);
-    ctx.strokeStyle = "#000000";
-    ctx.strokeRect(btnX + i * spacing, btnY, btnW, btnW);
+  // subtle noise / overlay effect (optional aesthetic)
+  ctx.globalAlpha = 0.05;
+  for (let i = 0; i < 3000; i++) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
   }
-  ctx.fillStyle = "#000000";
-  ctx.fillText("_", btnX + 4, btnY + 14); // minimize
-  ctx.fillRect(btnX + spacing + 4, btnY + 6, 8, 8); // maximize
-  ctx.beginPath(); // close
-  ctx.moveTo(btnX + spacing * 2 + 4, btnY + 4);
-  ctx.lineTo(btnX + spacing * 2 + 12, btnY + 12);
-  ctx.moveTo(btnX + spacing * 2 + 12, btnY + 4);
-  ctx.lineTo(btnX + spacing * 2 + 4, btnY + 12);
-  ctx.stroke();
+  ctx.globalAlpha = 1;
 
-  /* ===============================
-     🧩 MAIN CONTENT
-     =============================== */
-
+  /* -------------------------------
+     🖼️ Load media icons
+     ------------------------------- */
   const mediaDir = path.join(__dirname, "media");
   const logos = {
     dex: await loadImage(path.join(mediaDir, "dexscreener_logo_90s.png")),
@@ -68,49 +47,55 @@ async function generateStatsCard(data) {
     cat: await loadImage(path.join(mediaDir, "main_logo.jpg")),
   };
 
-  // Content panel background
-  ctx.fillStyle = "#dfdfdf";
-  ctx.fillRect(40, 70, width - 80, height - 140);
-  ctx.strokeStyle = "#808080";
-  ctx.strokeRect(40, 70, width - 80, height - 140);
+  /* -------------------------------
+     ✨ Header text
+     ------------------------------- */
+  ctx.font = "bold 38px 'Comic Sans MS'";
+  ctx.fillStyle = "#aaf0ff";
+  ctx.shadowColor = "#00ffff";
+  ctx.shadowBlur = 18;
+  ctx.fillText("😺 Chilled Cat Hourly Stats", 120, 70);
+  ctx.shadowBlur = 0;
 
-  // Content title
-  ctx.font = "bold 20px 'Tahoma'";
-  ctx.fillStyle = "#000";
-  ctx.fillText("Chilled Cat Hourly Snapshot", 60, 105);
-
-  // Stat rows
+  /* -------------------------------
+     🧾 Stat rows
+     ------------------------------- */
   const rows = [
-    { img: logos.dex, label: `Price: $${data.priceUsd}`, y: 160 },
-    { img: logos.ton, label: `Holders: ${data.holdersCount}`, y: 230 },
-    { img: logos.tg, label: `Members: ${data.telegramMembers}`, y: 300 },
-    { img: logos.x, label: `Followers: ${data.followers}`, y: 370 },
+    { img: logos.dex, label: `Price: $${data.priceUsd}`, y: 160, color: "#72e3ff" },
+    { img: logos.ton, label: `Holders: ${data.holdersCount}`, y: 240, color: "#7ef7d4" },
+    { img: logos.tg, label: `Members: ${data.telegramMembers}`, y: 320, color: "#89a8ff" },
+    { img: logos.x, label: `Followers: ${data.followers}`, y: 400, color: "#d597ff" },
   ];
 
   for (const row of rows) {
-    ctx.drawImage(row.img, 80, row.y - 30, 64, 64);
-    ctx.font = "16px 'Tahoma'";
-    ctx.fillText(row.label, 160, row.y + 10);
+    ctx.drawImage(row.img, 70, row.y - 45, 70, 70);
+    ctx.font = "bold 26px Arial";
+    ctx.fillStyle = row.color;
+    ctx.shadowColor = row.color;
+    ctx.shadowBlur = 10;
+    ctx.fillText(row.label, 180, row.y);
+    ctx.shadowBlur = 0;
   }
 
-  // Cat logo in corner
-  ctx.drawImage(logos.cat, width - 220, height - 200, 180, 180);
+  /* -------------------------------
+     🐾 Chilled Cat logo (bottom corner)
+     ------------------------------- */
+  ctx.drawImage(logos.cat, 600, 380, 160, 160);
 
-  // Bottom bar
-  ctx.fillStyle = "#000080";
-  ctx.fillRect(12, height - 36, width - 24, 24);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 14px 'Courier New'";
-  ctx.fillText(
-    `Updated: ${data.timestamp.split(".")[0].replace("T", " ")} UTC`,
-    24,
-    height - 18
-  );
+  /* -------------------------------
+     🕒 Timestamp
+     ------------------------------- */
+  ctx.font = "18px 'Courier New'";
+  ctx.fillStyle = "#ccc";
+  const time = data.timestamp.split(".")[0].replace("T", " ");
+  ctx.fillText(`Last Updated: ${time} UTC`, 70, 560);
 
-  // 💾 Save
-  const outPath = path.join(mediaDir, "snapshot_winrc.png");
+  /* -------------------------------
+     💾 Output
+     ------------------------------- */
+  const outPath = path.join(mediaDir, "snapshot_dark.png");
   fs.writeFileSync(outPath, canvas.toBuffer("image/png"));
-  console.log(`🖼️ Windows RC stats card saved → ${outPath}`);
+  console.log(`🌑 Dark-mode stats card saved → ${outPath}`);
   return outPath;
 }
 
