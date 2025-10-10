@@ -137,6 +137,10 @@ async function getTelegramData() {
 // =====================================================
 // 🐦 X / Twitter Scraper
 // =====================================================
+
+// =====================================================
+// 🐦 X / Twitter Scraper with mirror fallback
+// =====================================================
 let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
@@ -146,39 +150,43 @@ async function getXData() {
     if (cached) return JSON.parse(cached);
   }
 
-  try {
-    const url = "https://x.com/ChilledCatCoin";
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+  const mirrors = [
+    "https://nitter.net",
+    "https://nitter.poast.org",
+    "https://nitter.privacydev.net",
+    "https://nitter.lacontrevoie.fr",
+  ];
 
-    // 🧠 Look for followers_count or text like "12.3K Followers"
-    const match = data.match(/"followers_count":\s*(\d+)|([\d.,]+\s*[KM])\s*Followers/i);
+  for (const base of mirrors) {
+    try {
+      const url = `${base}/ChilledCatCoin`;
+      console.log(`🌐 Trying Nitter mirror: ${url}`);
+      const { data } = await axios.get(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+        },
+      });
 
-    let followers = 0;
-    if (match) {
-      const val = match[1] || match[2];
-      if (/K/i.test(val)) followers = parseFloat(val) * 1_000;
-      else if (/M/i.test(val)) followers = parseFloat(val) * 1_000_000;
-      else followers = parseInt(val);
+      const match = data.match(/Followers<\/span>\s*<span class="profile-stat-num">([\d,]+)/i);
+      if (match) {
+        const followers = parseInt(match[1].replace(/,/g, ""));
+        console.log(`🐦 Followers from ${base}: ${followers}`);
+        const result = { followers };
+        await redis.set("chilledcat:last_x_data", JSON.stringify(result));
+        lastXCheck = now;
+        return result;
+      }
+    } catch (err) {
+      console.warn(`⚠️ Nitter mirror failed (${base}): ${err.message}`);
+      continue;
     }
-
-    followers = Math.round(followers);
-    console.log(`🐦 Scraped X followers: ${followers}`);
-    const result = { followers };
-    await redis.set("chilledcat:last_x_data", JSON.stringify(result));
-    lastXCheck = now;
-    return result;
-  } catch (err) {
-    console.warn("⚠️ X scrape failed:", err.message);
-    const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) return JSON.parse(cached);
-    return { followers: 0 };
   }
+
+  console.warn("⚠️ All Nitter mirrors failed — using cached data");
+  const cached = await redis.get("chilledcat:last_x_data");
+  if (cached) return JSON.parse(cached);
+  return { followers: 0 };
 }
 
 // =====================================================
