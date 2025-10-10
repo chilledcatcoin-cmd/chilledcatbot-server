@@ -1,33 +1,21 @@
-/**
- * =====================================================
- * Chilled Cat Stats Scheduler + Manual Triggers
- * =====================================================
- */
-
 const cron = require("node-cron");
 const { postHourlyStats } = require("./dailystats");
+const { Redis } = require("@upstash/redis");
 
-/**
- * Initializes scheduled and manual update commands
- */
 function setupDailyStats(bot) {
-  // ✅ Schedule: every hour at minute 0
   cron.schedule("0 * * * *", async () => {
     console.log("⏰ Running hourly Chilled Cat stats update...");
     await postHourlyStats(bot);
   });
 
-  // ✅ Manual trigger
   bot.command("hourlyupdate", async (ctx) => {
     await ctx.reply("📊 Manually triggering Chilled Cat stats update...");
     await postHourlyStats(bot);
     await ctx.reply("✅ Manual update completed. Next update in 1 hour.");
   });
 
-  // ✅ Check last stats
   bot.command("checkstats", async (ctx) => {
     try {
-      const { Redis } = require("@upstash/redis");
       const redis = new Redis({
         url: process.env.UPSTASH_URL,
         token: process.env.UPSTASH_TOKEN,
@@ -40,11 +28,25 @@ function setupDailyStats(bot) {
         return ctx.reply("✅ Initial stats snapshot pulled! Next update in 1 hour.");
       }
 
-      const data = JSON.parse(raw);
-      const timestamp = new Date(data.timestamp).toISOString().replace("T", " ").split(".")[0] + " UTC";
-      await ctx.replyWithMarkdown(
-        `📊 *Last Chilled Cat Stats Snapshot*\n\n🕒 *Last Updated:* ${timestamp}`
-      );
+      const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const timestamp = new Date(data.timestamp)
+        .toISOString()
+        .replace("T", " ")
+        .split(".")[0] + " UTC";
+
+      const msg = `
+📊 *Last Chilled Cat Snapshot* 🕒
+
+💰 [Price: ${data.priceUsd ?? "—"} USD](https://dexscreener.com/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt)
+💦 Liquidity: ${data.liquidityUsd ?? "—"} USD
+👥 [Telegram Members: ${data.telegramMembers ?? "—"}](https://t.me/ChilledCatCoin)
+🐾 [Token Holders: ${data.holdersCount ?? "—"}](https://tonviewer.com/EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd/holders)
+🐦 [X Followers: ${data.followers ?? "—"}](https://x.com/ChilledCatCoin)
+
+🕒 *Last Updated:* ${timestamp}
+`;
+
+      await ctx.replyWithMarkdown(msg);
     } catch (err) {
       console.error("❌ /checkstats error:", err.message);
       await ctx.reply("❌ Failed to load stats data.");
