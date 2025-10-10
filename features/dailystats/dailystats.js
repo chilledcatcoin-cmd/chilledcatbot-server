@@ -222,7 +222,9 @@ const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
 // =====================================================
 // 🚀 MAIN FUNCTION
-// =====================================================
+// =====================================================// top of file:
+const { generateStatsCard } = require("./index"); // your canvas generator
+
 async function postHourlyStats(bot) {
   try {
     console.log("🚀 Fetching all Chilled Cat stats...");
@@ -237,25 +239,41 @@ async function postHourlyStats(bot) {
     const now = new Date();
     const next = new Date(now.getTime() + 60 * 60 * 1000);
 
-    const msg = `
-🐾 *[Chilled Cat Hourly Stats](https://chilledcatcoin.com)* 🐾
+    // ✅ Save latest snapshot (no treasury)
+    const statsData = {
+      holdersCount: ton.holdersCount,
+      ...dex,
+      ...x,
+      ...tg,
+    };
+    await saveData(statsData);
 
-💰 [${diff(dex.priceUsd, prev.priceUsd, "Price", " USD")}](${LINKS.dexscreener})
-📉 ${diff(dex.priceChange24h, prev.priceChange24h, "24h Change", "%")}
-📊 ${diff(dex.volume24hUsd, prev.volume24hUsd, "Volume (24h)", " USD")}
-💦 ${diff(dex.liquidityUsd, prev.liquidityUsd, "Liquidity", " USD")}
-💎 ${diff(ton.balanceTon, prev.balanceTon, "Treasury Balance", " TON")}
-🐾 [${diff(ton.holdersCount, prev.holdersCount, "Token Holders")}](${LINKS.holders})
-👥 [${diff(tg.telegramMembers, prev.telegramMembers, "Telegram Members")}](${LINKS.telegram})
-🐦 [${diff(x.followers, prev.followers, "X Followers")}](${LINKS.x})
+    // ✅ Generate the canvas snapshot image
+    const imgPath = await generateStatsCard({
+      ...statsData,
+      timestamp: now.toISOString(),
+    });
+
+    // ✅ Build caption with clickable links
+    const caption = `
+🐾 [Chilled Cat Hourly Stats](https://chilledcatcoin.com)
+
+💰 [Price: ${dex.priceUsd.toFixed(6)} USD](${LINKS.dexscreener})
+🐾 [Token Holders: ${ton.holdersCount}](${LINKS.holders})
+👥 [Telegram Members: ${tg.telegramMembers}](${LINKS.telegram})
+🐦 [X Followers: ${x.followers}](${LINKS.x})
 
 ⏰ *Last Updated:* ${fmtUTC(now)}
 🕒 *Next Update:* ${fmtUTC(next)}
 `;
 
-    await saveData({ ...ton, ...dex, ...x, ...tg });
-    await bot.telegram.sendMessage(CHANNEL_ID, msg, { parse_mode: "Markdown" });
-    console.log(`✅ Stats posted successfully at ${fmtUTC(now)}`);
+    await bot.telegram.sendPhoto(
+      CHANNEL_ID,
+      { source: imgPath },
+      { caption, parse_mode: "Markdown" }
+    );
+
+    console.log(`✅ Stats image posted successfully at ${fmtUTC(now)}`);
   } catch (err) {
     console.error("❌ Stats update error:", err.message);
   }
