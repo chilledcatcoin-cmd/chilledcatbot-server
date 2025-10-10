@@ -9,6 +9,7 @@
 
 const axios = require("axios");
 const { Redis } = require("@upstash/redis");
+const { generateStatsCard } = require("./canvas");
 
 // ✅ Upstash client (HTTP mode, no TCP)
 const redis = new Redis({
@@ -222,8 +223,7 @@ const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
 // =====================================================
 // 🚀 MAIN FUNCTION
-// =====================================================// top of file:
-const { generateStatsCard } = require("./canvas"); // your canvas generator
+// =====================================================//
 
 async function postHourlyStats(bot) {
   try {
