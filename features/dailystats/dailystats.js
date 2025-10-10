@@ -16,7 +16,7 @@ const redis = new Redis({
 console.log("🔌 Using Upstash Redis HTTP client");
 
 // ------------------- CONFIG -------------------
-const CHANNEL_ID = "@chilledcat";
+const CHANNEL_ID = "-4873969981";
 const TELEGRAM_STATS_CHAT = "-4873969981";
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
