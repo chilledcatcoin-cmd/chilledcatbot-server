@@ -93,7 +93,6 @@ bot.on("callback_query", async (ctx) => {
 // 🎮 Dynamic Game Launch Handler (Contest + Normal Mode)
 // =====================================================
 const { GAMES } = require("./features/games/games");
-const { contests } = require("./features/contests/contests");
 
 bot.on("callback_query", async (ctx) => {
   const query = ctx.callbackQuery;
