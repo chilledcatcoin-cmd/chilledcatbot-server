@@ -87,55 +87,6 @@ bot.on("callback_query", async (ctx) => {
 });
 
 
-
-
-// =====================================================
-// 🎮 Dynamic Game Launch Handler (Contest + Normal Mode)
-// =====================================================
-const { GAMES } = require("./features/games/games");
-
-bot.on("callback_query", async (ctx) => {
-  const query = ctx.callbackQuery;
-  const from = ctx.from;
-  const chatId = ctx.chat?.id;
-
-  // 🎮 Only handle game launches (ignore trivia / score / buttons)
-  if (!query.game_short_name) return;
-
-  const gameShortName = query.game_short_name;
-  const gameInfo = GAMES[gameShortName];
-  if (!gameInfo) return ctx.answerCbQuery("⚠️ Unknown game.");
-
-  // 🐾 Get active contest in this chat (if any)
-  const contest = contests.get(chatId);
-
-  // 👤 Serialize player info to pass to the game
-  const userData = encodeURIComponent(
-    JSON.stringify({
-      id: from.id,
-      username: from.username,
-      first_name: from.first_name,
-      chat_id: chatId,
-    })
-  );
-
-  // 🏁 If there’s a contest running for this game in this chat
-  if (contest && contest.game === gameShortName) {
-    const launchUrl = `${gameInfo.url}?contest=${contest.key}&end=${contest.expires}&chat=${chatId}&user=${userData}`;
-    console.log(`🎯 Launching contest mode for ${gameShortName} in chat ${chatId}`);
-    return ctx.answerCbQuery({ url: launchUrl });
-  }
-
-  // 🌍 Otherwise launch normal version
-  const normalUrl = `${gameInfo.url}?user=${userData}`;
-  console.log(`🎮 Launching normal mode for ${gameShortName} in chat ${chatId}`);
-  return ctx.answerCbQuery({ url: normalUrl });
-});
-
-
-
-
-
 const app = express();
 app.use(express.json());
 
