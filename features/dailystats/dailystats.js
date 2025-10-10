@@ -232,37 +232,47 @@ async function loadPrevData() {
 
 async function saveData(data) {
   try {
-    // 🔒 Deep-clean: remove undefined, circular refs, and non-JSON-safe fields
-    const safe = JSON.parse(
-      JSON.stringify(
-        data,
-        (key, value) => {
-          // skip functions and Telegraf bot/context objects
-          if (typeof value === "function") return undefined;
-          if (value && typeof value === "object" && value.constructor.name !== "Object") {
-            try {
-              // try to serialize plain data only
-              return JSON.parse(JSON.stringify(value));
-            } catch {
-              return undefined;
-            }
-          }
-          return value;
+    console.log("🧩 Raw data before cleaning:", data);
+
+    // Step 1: Deep-clean everything
+    const cleaned = {};
+    for (const [key, value] of Object.entries(data)) {
+      try {
+        if (value === undefined) continue;
+        if (typeof value === "object") {
+          cleaned[key] = JSON.parse(JSON.stringify(value));
+        } else {
+          cleaned[key] = value;
         }
-      )
-    );
+      } catch (err) {
+        console.warn(`⚠️ Could not clean field '${key}':`, err.message);
+        cleaned[key] = String(value);
+      }
+    }
 
-    safe.timestamp = new Date().toISOString();
+    // Step 2: Add timestamp
+    cleaned.timestamp = new Date().toISOString();
 
-    const payload = JSON.stringify(safe, null, 2);
-    console.log("💾 Safe payload ready for Upstash:\n", payload);
+    // Step 3: Verify we can stringify
+    let payload;
+    try {
+      payload = JSON.stringify(cleaned, null, 2);
+    } catch (err) {
+      console.error("❌ JSON.stringify failed! Falling back to stringified object dump.");
+      payload = String(cleaned);
+    }
 
-    await redis.set("chilledcat:stats", payload);
+    console.log("💾 Final sanitized payload:", payload);
+
+    // Step 4: Always send a string to Redis
+    await redis.set("chilledcat:stats", String(payload));
+
     console.log("✅ Redis save OK");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
   }
 }
+
 
 
 // =====================================================
