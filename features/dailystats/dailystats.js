@@ -2,6 +2,9 @@
  * =====================================================
  * Chilled Cat Stats Engine (Upstash + Telegram + Hyperlinks)
  * =====================================================
+ *  - Dexscreener + TONCenter + TonViewer + X + Telegram
+ *  - Cached API calls + Upstash persistence
+ * =====================================================
  */
 
 const axios = require("axios");
@@ -16,8 +19,8 @@ const redis = new Redis({
 console.log("🔌 Using Upstash Redis HTTP client");
 
 // ------------------- CONFIG -------------------
-const CHANNEL_ID = "-4873969981"; // Chilled Cat Testing group
-const TELEGRAM_STATS_CHAT = "-4873969981";
+const CHANNEL_ID = "-4873969981"; // Telegram group for posting
+const TELEGRAM_STATS_CHAT = "-4873969981"; // group for member count
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
@@ -26,7 +29,7 @@ const TON_BASE = "https://toncenter.com/api/v2";
 
 // ------------------- LINKS -------------------
 const LINKS = {
-  telegram: "https://t.me/ChilledCatCoin", // your TG group or channel
+  telegram: "https://t.me/ChilledCatCoin",
   x: "https://x.com/ChilledCatCoin",
   holders: `https://tonviewer.com/${TOKEN_CA}/holders`,
   dexscreener:
@@ -40,16 +43,7 @@ async function getTonData() {
   });
   const balanceTon = Number(info.data.result.balance) / 1e9;
 
-  // TONAPI holders
-  let holdersCount = 0;
-  try {
-    const res = await axios.get(
-      `https://api.tonapi.io/v2/accounts/${TOKEN_CA}/holders`
-    );
-    holdersCount = res.data.total || 0;
-  } catch {
-    console.warn("⚠️ Could not fetch holders count");
-  }
+  const { holdersCount } = await getHolderData();
 
   return { balanceTon, holdersCount };
 }
@@ -66,6 +60,22 @@ async function getDexData() {
   };
 }
 
+async function getHolderData() {
+  try {
+    const { data } = await axios.get(`https://api.tonapi.io/v2/accounts/${TOKEN_CA}/holders`);
+    return { holdersCount: data.total ?? 0 };
+  } catch (err) {
+    console.warn("⚠️ TONAPI failed, trying TonViewer...");
+    try {
+      const { data } = await axios.get(`https://tonapi.tonviewer.com/v2/accounts/${TOKEN_CA}/holders`);
+      return { holdersCount: data.total ?? 0 };
+    } catch {
+      console.warn("⚠️ Could not fetch holders count from either source");
+      return { holdersCount: 0 };
+    }
+  }
+}
+
 async function getTelegramData() {
   try {
     const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
@@ -78,14 +88,26 @@ async function getTelegramData() {
   }
 }
 
+// 🕒 Cached X follower fetch (prevents 429)
+let lastXCheck = 0;
 async function getXData() {
+  const now = Date.now();
+  if (now - lastXCheck < 5 * 60 * 1000) {
+    console.log("🕒 Skipping X fetch (cached <5m)");
+    const cached = await redis.get("chilledcat:last_x_data");
+    if (cached) return JSON.parse(cached);
+  }
+
   try {
     const BEARER = process.env.X_BEARER;
     const url = `https://api.x.com/2/users/${X_USER_ID}?user.fields=public_metrics`;
     const { data } = await axios.get(url, {
       headers: { Authorization: `Bearer ${BEARER}` },
     });
-    return { followers: data.data.public_metrics.followers_count };
+    const result = { followers: data.data.public_metrics.followers_count };
+    await redis.set("chilledcat:last_x_data", JSON.stringify(result));
+    lastXCheck = now;
+    return result;
   } catch (err) {
     console.warn("⚠️ X API fetch failed:", err.response?.data || err.message);
     return { followers: 0 };
@@ -98,7 +120,6 @@ async function loadPrevData() {
     const raw = await redis.get("chilledcat:stats");
     if (!raw) return {};
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    // Ensure all fields exist
     return {
       priceUsd: 0,
       priceChange24h: 0,
