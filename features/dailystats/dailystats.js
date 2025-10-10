@@ -12,7 +12,22 @@
 const axios = require("axios");
 const Redis = require("ioredis");
 
-const redis = new Redis(process.env.REDIS_URL);
+const Redis = require("ioredis");
+
+const redis = new Redis(process.env.REDIS_URL, {
+  tls: {},                        // ensures Upstash uses TLS
+  reconnectOnError: () => true,   // always try to reconnect
+  retryStrategy: (times) => Math.min(times * 200, 5000), // back-off reconnect
+  maxRetriesPerRequest: null,     // keep trying
+  enableReadyCheck: false,        // faster re-init
+});
+
+redis.on("error", (err) => {
+  console.warn("[Redis] Connection warning:", err.message);
+});
+redis.on("connect", () => console.log("🔌 Redis connected"));
+redis.on("reconnecting", () => console.log("♻️ Redis reconnecting..."));
+
 const CHANNEL_ID = "@chilledcat";
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
