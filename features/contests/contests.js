@@ -63,7 +63,7 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
   contests.set(ctx.chat.id, { game, key, expires, groupTitle });
   console.log(`📣 Contest started in chat ${ctx.chat.id} for ${game}`);
 
-  const bot = ctx.telegram;
+  const bot = ctx.telegram; // <-- direct Telegram API object
   const gameUrl = `${gameInfo.url}?contest=${key}&end=${expires}`;
 
   await bot.sendMessage(
@@ -72,21 +72,13 @@ async function startContest(ctx, game = "flappycat", minutes = 10) {
     { parse_mode: "Markdown" }
   );
 
-  // ✅ Send proper play button with URL params
-  await bot.sendMessage(ctx.chat.id, `🎮 Tap below to play *${gameInfo.title}* (Contest Mode):`, {
-    parse_mode: "Markdown",
+  await bot.sendGame(ctx.chat.id, game, {
     reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: `▶️ Play ${gameInfo.title}`,
-            url: gameUrl,
-          },
-        ],
-      ],
+      inline_keyboard: [[{ text: `🎮 Play ${gameInfo.title}`, callback_game: {} }]],
     },
   });
 
+  // Schedule updates using the bot instance (webhook-safe)
   scheduleUpdates(bot, ctx.chat.id, game, key, expires);
 }
 
