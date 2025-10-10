@@ -11,6 +11,13 @@
 
 const axios = require("axios");
 const Redis = require("ioredis");
+const { Telegraf } = require("telegraf");
+const api = new Telegraf(process.env.BOT_TOKEN);
+
+async function getTelegramData(bot) {
+  const members = await api.telegram.getChatMemberCount(CHANNEL_ID);
+  return { telegramMembers: members };
+}
 
 /* ------------------- Redis Client ------------------- */
 const redis = new Redis(process.env.REDIS_URL, {
