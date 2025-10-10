@@ -15,5 +15,6 @@
     "node-cron": "^3.0.3",
     "telegraf": "^4.15.3",
     "@upstash/redis": "^1.28.4"
+    "canvas": "^2.11.2"
   }
 }
