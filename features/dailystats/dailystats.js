@@ -223,7 +223,7 @@ const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 // =====================================================
 // 🚀 MAIN FUNCTION
 // =====================================================// top of file:
-const { generateStatsCard } = require("./index"); // your canvas generator
+const { generateStatsCard } = require("./canvas"); // your canvas generator
 
 async function postHourlyStats(bot) {
   try {
