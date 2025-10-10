@@ -1,10 +1,11 @@
 /**
  * =====================================================
- * Chilled Cat Stats Controller
+ * Chilled Cat Stats Controller (Dynamic Scheduler)
  * =====================================================
- *  - Initializes hourly cron schedule
- *  - Registers /hourlyupdate (manual trigger)
- *  - Registers /checkstats (show last saved snapshot)
+ * - Automatically fetches and posts hourly stats
+ * - /hourlyupdate forces a pull immediately
+ * - /checkstats shows last saved data
+ * - Next update always 1 hour after last successful pull
  * =====================================================
  */
 
@@ -19,7 +20,9 @@ const redis = new Redis(process.env.REDIS_URL, {
   retryStrategy: (times) => Math.min(times * 200, 5000),
 });
 
-/* -------------------- Helper to load last saved stats -------------------- */
+let scheduledTask = null;
+
+/* -------------------- Redis Snapshot Loader -------------------- */
 async function getLastStats() {
   try {
     const raw = await redis.get("chilledcat:stats");
@@ -30,24 +33,51 @@ async function getLastStats() {
   }
 }
 
-/* -------------------- Main Initialization -------------------- */
-function initHourlyStats(bot) {
-  // ⏰ Run every hour
-  cron.schedule("0 * * * *", () => postHourlyStats(bot));
-  console.log("📅 Hourly Chilled Cat stats scheduled (every top of hour)");
+/* -------------------- Dynamic Scheduler -------------------- */
+function scheduleNextRun(bot, delayMs = 60 * 60 * 1000) {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+  }
 
-  // 📊 Manual update command
-  bot.command("hourlyupdate", async (ctx) => {
-    await ctx.reply("📊 Posting latest Chilled Cat stats...");
+  const nextTime = new Date(Date.now() + delayMs);
+  const minutes = nextTime.getMinutes();
+  const hours = nextTime.getHours();
+
+  // cron-style schedule expression for one-time future run
+  const cronExpr = `${minutes} ${hours} * * *`;
+
+  scheduledTask = cron.schedule(cronExpr, async () => {
+    console.log("⏰ Triggering next scheduled Chilled Cat stats update...");
     await postHourlyStats(bot);
-    await ctx.reply("✅ Stats posted!");
+    scheduleNextRun(bot); // reschedule again 1 hour later
   });
 
-  // 🔎 Check last saved stats (from Redis)
+  console.log(`🕒 Next scheduled update: ${nextTime.toISOString().replace("T", " ").split(".")[0]} UTC`);
+}
+
+/* -------------------- Main Init -------------------- */
+function initHourlyStats(bot) {
+  console.log("🚀 Initializing Chilled Cat Stats system...");
+
+  // Manual trigger command
+  bot.command("hourlyupdate", async (ctx) => {
+    await ctx.reply("📊 Manually triggering Chilled Cat stats update...");
+    await postHourlyStats(bot);
+    await ctx.reply("✅ Manual update completed. Next update in 1 hour.");
+    scheduleNextRun(bot);
+  });
+
+  // Check saved stats (if no data, trigger first pull)
   bot.command("checkstats", async (ctx) => {
     const data = await getLastStats();
+
     if (!data) {
-      return ctx.reply("⚠️ No stats found in Redis yet. Wait for the next hourly update.");
+      await ctx.reply("⚠️ No data yet — fetching first stats snapshot...");
+      await postHourlyStats(bot);
+      await ctx.reply("✅ Initial stats snapshot pulled! Next update in 1 hour.");
+      scheduleNextRun(bot);
+      return;
     }
 
     const ts = new Date(data.timestamp).toISOString().replace("T", " ").split(".")[0] + " UTC";
@@ -67,6 +97,21 @@ function initHourlyStats(bot) {
 `;
     await ctx.replyWithMarkdown(msg);
   });
+
+  // At startup, if data exists, use timestamp to schedule next update
+  (async () => {
+    const last = await getLastStats();
+    if (last && last.timestamp) {
+      const lastTime = new Date(last.timestamp).getTime();
+      const diff = Date.now() - lastTime;
+      const remaining = 60 * 60 * 1000 - diff;
+      const nextDelay = Math.max(remaining, 10000); // at least 10s buffer
+      console.log(`🕓 Resuming schedule; next update in ${(nextDelay / 60000).toFixed(1)} min`);
+      scheduleNextRun(bot, nextDelay);
+    } else {
+      console.log("🕓 No existing stats — waiting for manual trigger (/checkstats or /hourlyupdate).");
+    }
+  })();
 }
 
 module.exports = { initHourlyStats };
