@@ -119,10 +119,12 @@ async function getTelegramData() {
       },
     });
 
-    const match = data.match(/(\d+(?:,\d+)*)\s+members/);
+    // Works for members / subscribers / followers
+    const match = data.match(/(\d+(?:,\d+)*)\s+(members|subscribers|followers)/i);
     if (match) {
       const telegramMembers = parseInt(match[1].replace(/,/g, ""));
       console.log(`👥 Scraped Telegram members: ${telegramMembers}`);
+      await redis.set("chilledcat:last_tg", telegramMembers);
       return { telegramMembers };
     }
     throw new Error("No members found");
@@ -135,11 +137,7 @@ async function getTelegramData() {
 }
 
 // =====================================================
-// 🐦 X / Twitter Scraper
-// =====================================================
-
-// =====================================================
-// 🐦 X / Twitter Scraper with mirror fallback
+// 🐦 X / Twitter Scraper with mirror + fallback
 // =====================================================
 let lastXCheck = 0;
 async function getXData() {
@@ -168,11 +166,17 @@ async function getXData() {
         },
       });
 
-      const match = data.match(/Followers<\/span>\s*<span class="profile-stat-num">([\d,]+)/i);
+      const match = data.match(/Followers<\/span>\s*<span class="profile-stat-num">([\d.,KkMm]+)/i);
       if (match) {
-        const followers = parseInt(match[1].replace(/,/g, ""));
+        let followersText = match[1].trim();
+        // Handle K / M shorthand (e.g., 12.3K, 1.2M)
+        let followers = 0;
+        if (/k$/i.test(followersText)) followers = parseFloat(followersText) * 1_000;
+        else if (/m$/i.test(followersText)) followers = parseFloat(followersText) * 1_000_000;
+        else followers = parseInt(followersText.replace(/,/g, ""));
+
         console.log(`🐦 Followers from ${base}: ${followers}`);
-        const result = { followers };
+        const result = { followers: Math.round(followers) };
         await redis.set("chilledcat:last_x_data", JSON.stringify(result));
         lastXCheck = now;
         return result;
@@ -183,7 +187,19 @@ async function getXData() {
     }
   }
 
-  console.warn("⚠️ All Nitter mirrors failed — using cached data");
+  // Last resort fallback: SocialCounts.org
+  try {
+    const res = await axios.get("https://api.socialcounts.org/twitter-user/ChilledCatCoin");
+    const followers = res.data.user?.followers || 0;
+    console.log(`🪶 Fallback follower count: ${followers}`);
+    const result = { followers };
+    await redis.set("chilledcat:last_x_data", JSON.stringify(result));
+    return result;
+  } catch (err) {
+    console.warn("⚠️ Fallback fetch failed:", err.message);
+  }
+
+  console.warn("⚠️ All sources failed — using cached data");
   const cached = await redis.get("chilledcat:last_x_data");
   if (cached) return JSON.parse(cached);
   return { followers: 0 };
@@ -217,9 +233,12 @@ async function loadPrevData() {
 async function saveData(data) {
   try {
     data.timestamp = new Date().toISOString();
-    const payload = JSON.stringify(data, null, 2);
-    console.log("💾 Saving snapshot to Upstash:\n", payload);
-    await redis.set("chilledcat:stats", payload);
+
+    // ensure safe serialization
+    const safeData = JSON.parse(JSON.stringify(data));
+
+    console.log("💾 Saving snapshot to Upstash:\n", safeData);
+    await redis.set("chilledcat:stats", JSON.stringify(safeData));
     console.log("✅ Redis save OK");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
