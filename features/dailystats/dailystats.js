@@ -59,10 +59,10 @@ async function getDexData() {
   const pair = data.pairs?.[0];
   if (!pair) throw new Error("No Dexscreener data found");
   return {
-    priceUsd: parseFloat(pair.priceUsd) || 0,
-    priceChange24h: parseFloat(pair.priceChange.h24) || 0,
-    volume24hUsd: parseFloat(pair.volume.h24) || 0,
-    liquidityUsd: parseFloat(pair.liquidity.usd) || 0,
+    priceUsd: parseFloat(pair.priceUsd || 0),
+    priceChange24h: parseFloat(pair?.priceChange?.h24 || 0),
+    volume24hUsd: parseFloat(pair?.volume?.h24 || 0),
+    liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
   };
 }
 
@@ -97,7 +97,19 @@ async function loadPrevData() {
   try {
     const raw = await redis.get("chilledcat:stats");
     if (!raw) return {};
-    return typeof raw === "string" ? JSON.parse(raw) : raw;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    // Ensure all fields exist
+    return {
+      priceUsd: 0,
+      priceChange24h: 0,
+      volume24hUsd: 0,
+      liquidityUsd: 0,
+      balanceTon: 0,
+      holdersCount: 0,
+      telegramMembers: 0,
+      followers: 0,
+      ...parsed,
+    };
   } catch (err) {
     console.error("⚠️ Redis load error:", err.message);
     return {};
