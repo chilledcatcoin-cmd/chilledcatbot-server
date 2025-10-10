@@ -10,17 +10,16 @@
 const axios = require("axios");
 const { Redis } = require("@upstash/redis");
 
-// ✅ Upstash client (HTTP)
+// ✅ Upstash client (HTTP mode, no TCP)
 const redis = new Redis({
   url: process.env.UPSTASH_URL,
   token: process.env.UPSTASH_TOKEN,
 });
-
 console.log("🔌 Using Upstash Redis HTTP client");
 
 // ------------------- CONFIG -------------------
-const CHANNEL_ID = "-4873969981"; // Telegram group for posting
-const TELEGRAM_STATS_CHAT = "-4873969981"; // group for member count
+const CHANNEL_ID = "-4873969981";
+const TELEGRAM_STATS_CHAT = "-4873969981";
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
@@ -36,13 +35,21 @@ const LINKS = {
     "https://dexscreener.com/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt",
 };
 
-// ------------------- FETCHERS -------------------
+// =====================================================
+// 🧭 FETCHERS
+// =====================================================
+
+/**
+ * TON + Holders data
+ */
 async function getTonData() {
+  // --- Treasury TON balance ---
   const info = await axios.get(`${TON_BASE}/getAddressInformation`, {
     params: { address: TOKEN_CA },
   });
   const balanceTon = Number(info.data.result.balance) / 1e9;
 
+  // --- Token holders count ---
   let holdersCount = 0;
   try {
     const url = `https://tonapi.io/v2/jettons/${TOKEN_CA}/holders`;
@@ -62,43 +69,54 @@ async function getTonData() {
   } catch (err) {
     console.warn("⚠️ TonAPI holders fetch failed:", err.response?.data || err.message);
 
+    // Fallback to cached holder count
     const cached = await redis.get("chilledcat:last_holders");
     holdersCount = cached ? Number(cached) : 0;
     if (holdersCount) console.log(`📦 Using cached holders: ${holdersCount}`);
   }
 
+  // Cache the value
   await redis.set("chilledcat:last_holders", holdersCount);
   return { balanceTon, holdersCount };
 }
 
+/**
+ * Dexscreener data with caching + fallback
+ */
 async function getDexData() {
-  const { data } = await axios.get(DEX_URL);
-  const pair = data.pairs?.[0];
-  if (!pair) throw new Error("No Dexscreener data found");
-  return {
-    priceUsd: parseFloat(pair.priceUsd || 0),
-    priceChange24h: parseFloat(pair?.priceChange?.h24 || 0),
-    volume24hUsd: parseFloat(pair?.volume?.h24 || 0),
-    liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
-  };
-}
-
-async function getHolderData() {
   try {
-    const { data } = await axios.get(`https://api.tonapi.io/v2/accounts/${TOKEN_CA}/holders`);
-    return { holdersCount: data.total ?? 0 };
+    const { data } = await axios.get(DEX_URL);
+    const pair = data.pairs?.[0];
+    if (!pair) throw new Error("No Dexscreener data found");
+
+    const result = {
+      priceUsd: parseFloat(pair.priceUsd || 0),
+      priceChange24h: parseFloat(pair?.priceChange?.h24 || 0),
+      volume24hUsd: parseFloat(pair?.volume?.h24 || 0),
+      liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
+    };
+
+    await redis.set("chilledcat:last_dex", JSON.stringify(result));
+    return result;
   } catch (err) {
-    console.warn("⚠️ TONAPI failed, trying TonViewer...");
-    try {
-      const { data } = await axios.get(`https://tonapi.tonviewer.com/v2/accounts/${TOKEN_CA}/holders`);
-      return { holdersCount: data.total ?? 0 };
-    } catch {
-      console.warn("⚠️ Could not fetch holders count from either source");
-      return { holdersCount: 0 };
+    console.warn("⚠️ Dexscreener fetch failed:", err.message);
+    const cached = await redis.get("chilledcat:last_dex");
+    if (cached) {
+      console.log("📦 Using cached Dex data");
+      return JSON.parse(cached);
     }
+    return {
+      priceUsd: 0,
+      priceChange24h: 0,
+      volume24hUsd: 0,
+      liquidityUsd: 0,
+    };
   }
 }
 
+/**
+ * Telegram member count
+ */
 async function getTelegramData() {
   try {
     const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
@@ -111,7 +129,9 @@ async function getTelegramData() {
   }
 }
 
-// 🕒 Cached X follower fetch (prevents 429)
+/**
+ * X / Twitter followers — cached to avoid rate limit 429
+ */
 let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
@@ -127,17 +147,25 @@ async function getXData() {
     const { data } = await axios.get(url, {
       headers: { Authorization: `Bearer ${BEARER}` },
     });
+
     const result = { followers: data.data.public_metrics.followers_count };
     await redis.set("chilledcat:last_x_data", JSON.stringify(result));
     lastXCheck = now;
     return result;
   } catch (err) {
     console.warn("⚠️ X API fetch failed:", err.response?.data || err.message);
+    const cached = await redis.get("chilledcat:last_x_data");
+    if (cached) {
+      console.log("📦 Using cached X data");
+      return JSON.parse(cached);
+    }
     return { followers: 0 };
   }
 }
 
-// ------------------- REDIS HELPERS -------------------
+// =====================================================
+// 🧱 REDIS HELPERS
+// =====================================================
 async function loadPrevData() {
   try {
     const raw = await redis.get("chilledcat:stats");
@@ -163,14 +191,19 @@ async function loadPrevData() {
 async function saveData(data) {
   try {
     data.timestamp = new Date().toISOString();
-    await redis.set("chilledcat:stats", JSON.stringify(data));
-    console.log("💾 Stats snapshot saved to Upstash");
+    const payload = JSON.stringify(data, null, 2);
+    console.log("💾 Attempting to save to Upstash:\n", payload);
+
+    const result = await redis.set("chilledcat:stats", payload);
+    console.log("✅ Redis response:", result);
   } catch (err) {
-    console.error("❌ Redis save error:", err.message);
+    console.error("❌ Redis save error:", err.response?.data || err.message);
   }
 }
 
-// ------------------- HELPERS -------------------
+// =====================================================
+// 🧮 HELPERS
+// =====================================================
 function clean(value, decimals = 2) {
   if (value === null || isNaN(value)) return "—";
   return Number(value).toFixed(decimals);
@@ -180,14 +213,16 @@ function diff(curr, prev, label, suffix = "") {
   if (prev === undefined) return `${label}: ${clean(curr)}${suffix}`;
   const delta = curr - prev;
   if (isNaN(delta)) return `${label}: ${clean(curr)}${suffix}`;
-  const arrow = delta > 0 ? "📈" : delta < 0 ? "📉" : "⏸";
+  const arrow = delta > 0 ? "📈" : delta < 0 ? "📉" : "⏸️";
   const sign = delta > 0 ? "+" : "";
   return `${label}: ${clean(curr)}${suffix} (${arrow} ${sign}${clean(delta)}${suffix})`;
 }
 
 const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
-// ------------------- MAIN FUNCTION -------------------
+// =====================================================
+// 🚀 MAIN FUNCTION
+// =====================================================
 async function postHourlyStats(bot) {
   try {
     console.log("🚀 Fetching all Chilled Cat stats...");
