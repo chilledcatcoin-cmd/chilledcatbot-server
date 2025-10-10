@@ -2,17 +2,17 @@
  * =====================================================
  * Chilled Cat Stats Engine (Upstash + Telegram + Hyperlinks)
  * =====================================================
- *  - Dexscreener + TONCenter + TonViewer + X + Telegram
+ *  - Dexscreener + TONCenter + TonViewer + X (scraper) + Telegram (scraper)
  *  - Cached API calls + Upstash persistence
+ *  - No external API tokens required for X/Telegram
  * =====================================================
  */
 
 const axios = require("axios");
 const { Redis } = require("@upstash/redis");
 const { generateStatsCard } = require("./canvas");
-const { getTwitterFollowers } = require("./xscraper");
 
-// ✅ Upstash client (HTTP mode, no TCP)
+// ✅ Upstash client (HTTP mode)
 const redis = new Redis({
   url: process.env.UPSTASH_URL,
   token: process.env.UPSTASH_TOKEN,
@@ -20,12 +20,10 @@ const redis = new Redis({
 console.log("🔌 Using Upstash Redis HTTP client");
 
 // ------------------- CONFIG -------------------
-const CHANNEL_ID = "-4873969981";
-const TELEGRAM_STATS_CHAT = "-4873969981";
+const CHANNEL_ID = "-4873969981"; // target group/channel
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
-const X_USER_ID = "1891578650074370048"; // @ChilledCatCoin
 const TON_BASE = "https://toncenter.com/api/v2";
 
 // ------------------- LINKS -------------------
@@ -45,39 +43,31 @@ const LINKS = {
  * TON + Holders data
  */
 async function getTonData() {
-  // --- Treasury TON balance ---
   const info = await axios.get(`${TON_BASE}/getAddressInformation`, {
     params: { address: TOKEN_CA },
   });
   const balanceTon = Number(info.data.result.balance) / 1e9;
 
-  // --- Token holders count ---
   let holdersCount = 0;
   try {
     const url = `https://tonapi.io/v2/jettons/${TOKEN_CA}/holders`;
     console.log("🌐 Fetching holders from:", url);
-
     const headers = {};
     if (process.env.TONAPI_KEY) headers.Authorization = `Bearer ${process.env.TONAPI_KEY}`;
 
     const res = await axios.get(url, { headers });
-
     if (!res.data || typeof res.data.total === "undefined") {
       throw new Error("Invalid TonAPI response");
     }
-
     holdersCount = res.data.total;
     console.log(`✅ Holders fetched: ${holdersCount}`);
   } catch (err) {
     console.warn("⚠️ TonAPI holders fetch failed:", err.response?.data || err.message);
-
-    // Fallback to cached holder count
     const cached = await redis.get("chilledcat:last_holders");
     holdersCount = cached ? Number(cached) : 0;
     if (holdersCount) console.log(`📦 Using cached holders: ${holdersCount}`);
   }
 
-  // Cache the value
   await redis.set("chilledcat:last_holders", holdersCount);
   return { balanceTon, holdersCount };
 }
@@ -116,29 +106,40 @@ async function getDexData() {
   }
 }
 
-/**
- * Telegram member count
- */
+// =====================================================
+// 👥 Telegram Scraper
+// =====================================================
 async function getTelegramData() {
   try {
-    const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
-    const { data } = await axios.get(url);
-    if (!data.ok) throw new Error(JSON.stringify(data));
-    return { telegramMembers: data.result || 0 };
+    const url = LINKS.telegram;
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+      },
+    });
+
+    const match = data.match(/(\d+(?:,\d+)*)\s+members/);
+    if (match) {
+      const telegramMembers = parseInt(match[1].replace(/,/g, ""));
+      console.log(`👥 Scraped Telegram members: ${telegramMembers}`);
+      return { telegramMembers };
+    }
+    throw new Error("No members found");
   } catch (err) {
-    console.warn("⚠️ Telegram member fetch failed:", err.response?.data || err.message);
+    console.warn("⚠️ Telegram scrape failed:", err.message);
+    const cached = await redis.get("chilledcat:last_tg");
+    if (cached) return { telegramMembers: Number(cached) };
     return { telegramMembers: 0 };
   }
 }
 
 // =====================================================
-// 🐦 X Scraper Integration (no API needed)
+// 🐦 X / Twitter Scraper
 // =====================================================
 let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
-
-  // Cache for 5 minutes
   if (now - lastXCheck < 5 * 60 * 1000) {
     console.log("🕒 Skipping X fetch (cached <5m)");
     const cached = await redis.get("chilledcat:last_x_data");
@@ -146,23 +147,39 @@ async function getXData() {
   }
 
   try {
-    const followers = await getTwitterFollowers("ChilledCatCoin");
+    const url = "https://x.com/ChilledCatCoin";
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+
+    // 🧠 Look for followers_count or text like "12.3K Followers"
+    const match = data.match(/"followers_count":\s*(\d+)|([\d.,]+\s*[KM])\s*Followers/i);
+
+    let followers = 0;
+    if (match) {
+      const val = match[1] || match[2];
+      if (/K/i.test(val)) followers = parseFloat(val) * 1_000;
+      else if (/M/i.test(val)) followers = parseFloat(val) * 1_000_000;
+      else followers = parseInt(val);
+    }
+
+    followers = Math.round(followers);
+    console.log(`🐦 Scraped X followers: ${followers}`);
     const result = { followers };
     await redis.set("chilledcat:last_x_data", JSON.stringify(result));
     lastXCheck = now;
-    console.log(`✅ Scraped X followers: ${followers}`);
     return result;
   } catch (err) {
-    console.warn("⚠️ X Scraper failed:", err.message);
+    console.warn("⚠️ X scrape failed:", err.message);
     const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) {
-      console.log("📦 Using cached X data");
-      return JSON.parse(cached);
-    }
+    if (cached) return JSON.parse(cached);
     return { followers: 0 };
   }
 }
-
 
 // =====================================================
 // 🧱 REDIS HELPERS
@@ -193,37 +210,23 @@ async function saveData(data) {
   try {
     data.timestamp = new Date().toISOString();
     const payload = JSON.stringify(data, null, 2);
-    console.log("💾 Attempting to save to Upstash:\n", payload);
-
-    const result = await redis.set("chilledcat:stats", payload);
-    console.log("✅ Redis response:", result);
+    console.log("💾 Saving snapshot to Upstash:\n", payload);
+    await redis.set("chilledcat:stats", payload);
+    console.log("✅ Redis save OK");
   } catch (err) {
-    console.error("❌ Redis save error:", err.response?.data || err.message);
+    console.error("❌ Redis save error:", err.message);
   }
 }
 
 // =====================================================
-// 🧮 HELPERS
+// 🚀 MAIN FUNCTION
 // =====================================================
 function clean(value, decimals = 2) {
   if (value === null || isNaN(value)) return "—";
   return Number(value).toFixed(decimals);
 }
 
-function diff(curr, prev, label, suffix = "") {
-  if (prev === undefined) return `${label}: ${clean(curr)}${suffix}`;
-  const delta = curr - prev;
-  if (isNaN(delta)) return `${label}: ${clean(curr)}${suffix}`;
-  const arrow = delta > 0 ? "📈" : delta < 0 ? "📉" : "⏸️";
-  const sign = delta > 0 ? "+" : "";
-  return `${label}: ${clean(curr)}${suffix} (${arrow} ${sign}${clean(delta)}${suffix})`;
-}
-
 const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
-
-// =====================================================
-// 🚀 MAIN FUNCTION
-// =====================================================//
 
 async function postHourlyStats(bot) {
   try {
@@ -235,11 +238,9 @@ async function postHourlyStats(bot) {
       getTelegramData(),
     ]);
 
-    const prev = await loadPrevData();
     const now = new Date();
     const next = new Date(now.getTime() + 60 * 60 * 1000);
 
-    // ✅ Save latest snapshot (no treasury)
     const statsData = {
       holdersCount: ton.holdersCount,
       ...dex,
@@ -248,13 +249,11 @@ async function postHourlyStats(bot) {
     };
     await saveData(statsData);
 
-    // ✅ Generate the canvas snapshot image
     const imgPath = await generateStatsCard({
       ...statsData,
       timestamp: now.toISOString(),
     });
 
-    // ✅ Build caption with clickable links
     const caption = `
 🐾 [Chilled Cat Hourly Stats](https://chilledcatcoin.com)
 
