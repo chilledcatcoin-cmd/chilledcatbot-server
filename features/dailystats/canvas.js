@@ -8,7 +8,7 @@ async function generateStatsCard(data) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // background gradient
+  // 🎨 Background gradient
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, "#3a1c71");
   gradient.addColorStop(0.5, "#d76d77");
@@ -16,19 +16,22 @@ async function generateStatsCard(data) {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
+  // 🖼️ Load logos
   const mediaDir = path.join(__dirname, "media");
   const logos = {
     dex: await loadImage(path.join(mediaDir, "dexscreener_logo_90s.png")),
     ton: await loadImage(path.join(mediaDir, "ton_logo_90s.png")),
     tg: await loadImage(path.join(mediaDir, "telegram_logo_90s.png")),
     x: await loadImage(path.join(mediaDir, "x_logo_90s.png")),
-    cat: await loadImage(path.join(mediaDir, "sticker_9.webp")),
+    cat: await loadImage(path.join(mediaDir, "main_logo.jpg")),
   };
 
+  // 🧠 Title
   ctx.font = "bold 32px 'Comic Sans MS'";
   ctx.fillStyle = "#fff";
   ctx.fillText("😺 Chilled Cat Hourly Stats", 140, 60);
 
+  // 🧩 Stat Rows
   const rows = [
     { img: logos.dex, label: `Price: $${data.priceUsd}`, y: 150 },
     { img: logos.ton, label: `Holders: ${data.holdersCount}`, y: 230 },
@@ -42,10 +45,18 @@ async function generateStatsCard(data) {
     ctx.fillText(row.label, 180, row.y + 5);
   }
 
+  // 🐾 Draw Cat logo
   ctx.drawImage(logos.cat, 600, 380, 160, 160);
-  ctx.font = "18px 'Courier New'";
-  ctx.fillText(`Last Updated: ${data.timestamp.split(".")[0].replace("T", " ")} UTC`, 80, 550);
 
+  // 🕒 Timestamp
+  ctx.font = "18px 'Courier New'";
+  ctx.fillText(
+    `Last Updated: ${data.timestamp.split(".")[0].replace("T", " ")} UTC`,
+    80,
+    550
+  );
+
+  // 💾 Save output
   const outPath = path.join(mediaDir, "snapshot.png");
   fs.writeFileSync(outPath, canvas.toBuffer("image/png"));
   console.log(`🖼️ Stats card saved → ${outPath}`);
