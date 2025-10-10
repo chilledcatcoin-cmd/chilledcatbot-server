@@ -8,10 +8,9 @@
  */
 
 const axios = require("axios");
-const OAuth = require("oauth-1.0a");
-const crypto = require("crypto");
 const { Redis } = require("@upstash/redis");
 const { generateStatsCard } = require("./canvas");
+const { getTwitterFollowers } = require("./xscraper");
 
 // ✅ Upstash client (HTTP mode, no TCP)
 const redis = new Redis({
@@ -132,28 +131,14 @@ async function getTelegramData() {
   }
 }
 
-/**
- * X / Twitter followers — OAuth 1.0a (user context, avoids app limit)
- */
-const oauth = OAuth({
-  consumer: {
-    key: process.env.X_CONSUMER_KEY,
-    secret: process.env.X_CONSUMER_SECRET,
-  },
-  signature_method: "HMAC-SHA1",
-  hash_function(base, key) {
-    return crypto.createHmac("sha1", key).update(base).digest("base64");
-  },
-});
-
-const xToken = {
-  key: process.env.X_ACCESS_TOKEN,
-  secret: process.env.X_ACCESS_SECRET,
-};
-
+// =====================================================
+// 🐦 X Scraper Integration (no API needed)
+// =====================================================
 let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
+
+  // Cache for 5 minutes
   if (now - lastXCheck < 5 * 60 * 1000) {
     console.log("🕒 Skipping X fetch (cached <5m)");
     const cached = await redis.get("chilledcat:last_x_data");
@@ -161,23 +146,14 @@ async function getXData() {
   }
 
   try {
-    const url = "https://api.x.com/1.1/users/show.json";
-    const requestData = { url, method: "GET", data: { screen_name: "ChilledCatCoin" } };
-    const authHeader = oauth.toHeader(oauth.authorize(requestData, xToken));
-
-    const res = await axios.get(url, {
-      params: { screen_name: "ChilledCatCoin" },
-      headers: { Authorization: authHeader.Authorization },
-    });
-
-    const followers = res.data.followers_count;
+    const followers = await getTwitterFollowers("ChilledCatCoin");
     const result = { followers };
     await redis.set("chilledcat:last_x_data", JSON.stringify(result));
     lastXCheck = now;
-    console.log(`✅ X followers fetched: ${followers}`);
+    console.log(`✅ Scraped X followers: ${followers}`);
     return result;
   } catch (err) {
-    console.warn("⚠️ X OAuth fetch failed:", err.response?.data || err.message);
+    console.warn("⚠️ X Scraper failed:", err.message);
     const cached = await redis.get("chilledcat:last_x_data");
     if (cached) {
       console.log("📦 Using cached X data");
