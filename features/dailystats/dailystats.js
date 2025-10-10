@@ -14,15 +14,15 @@ const Redis = require("ioredis");
 
 /* ------------------- Redis Client ------------------- */
 const redis = new Redis(process.env.REDIS_URL, {
-  tls: {},                          // secure TLS for Upstash
-  lazyConnect: true,                // connect only when needed
-  connectTimeout: 10000,            // 10 s connect timeout
-  enableOfflineQueue: true,         // queue commands during reconnect
-  maxRetriesPerRequest: null,       // no hard 20-retry limit
-  enableReadyCheck: false,          // faster startup
+  tls: {},
+  lazyConnect: true,
+  connectTimeout: 10000,
+  enableOfflineQueue: true,
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
   reconnectOnError: (err) => {
     console.warn("[Redis] reconnectOnError:", err.code || err.message);
-    return true; // always reconnect
+    return true;
   },
   retryStrategy: (attempt) => {
     const delay = Math.min(attempt * 500, 5000);
@@ -34,11 +34,18 @@ const redis = new Redis(process.env.REDIS_URL, {
 redis.on("connect", () => console.log("🔌 Redis connected"));
 redis.on("ready", () => console.log("✅ Redis ready"));
 redis.on("reconnecting", () => console.log("♻️ Redis reconnecting..."));
-redis.on("error", (err) => console.warn("[Redis] connection issue:", err.code || err.message));
+redis.on("error", (err) =>
+  console.warn("[Redis] connection issue:", err.code || err.message)
+);
 
 /* ------------------- Config ------------------- */
+// Channel where stats are posted
 const CHANNEL_ID = "@chilledcat";
-const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
+// Group where member count is measured
+const TELEGRAM_STATS_CHAT = "-4873969981"; // Chilled Cat Testing group
+
+const TOKEN_CA =
+  "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
 const X_USER_ID = "1891578650074370048"; // @ChilledCatCoin
@@ -79,10 +86,10 @@ async function getXData() {
   return { followers: data.data.public_metrics.followers_count };
 }
 
-// ✅ Webhook-safe Telegram data fetcher (using raw Telegram API)
+// ✅ Webhook-safe Telegram data fetcher
 async function getTelegramData() {
   try {
-    const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${CHANNEL_ID}`;
+    const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
     const { data } = await axios.get(url);
     if (!data.ok) throw new Error("Telegram API error");
     return { telegramMembers: data.result };
@@ -111,17 +118,20 @@ function diff(curr, prev, label, suffix = "") {
   const sign = delta > 0 ? "+" : "";
   return `${label}: ${curr}${suffix} (${arrow} ${sign}${delta.toFixed(2)}${suffix})`;
 }
-const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
+const fmtUTC = (d) =>
+  d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
 /* ------------------- Main Post Function ------------------- */
 async function postHourlyStats(bot) {
   try {
-    const [ton, dex, x, tg] = await Promise.all([
-      getTonData(),
-      getDexData(),
-      getXData(),
-      getTelegramData(),
-    ]);
+    // sequential fetches with small delays to avoid 429s
+    const ton = await getTonData();
+    await new Promise((r) => setTimeout(r, 500));
+    const dex = await getDexData();
+    await new Promise((r) => setTimeout(r, 500));
+    const x = await getXData();
+    await new Promise((r) => setTimeout(r, 500));
+    const tg = await getTelegramData();
 
     const prev = await loadPrevData();
     const now = new Date();
@@ -143,7 +153,9 @@ async function postHourlyStats(bot) {
 🕒 *Next Update:* ${fmtUTC(next)}
 `;
 
-    await bot.telegram.sendMessage(CHANNEL_ID, msg, { parse_mode: "Markdown" });
+    await bot.telegram.sendMessage(CHANNEL_ID, msg, {
+      parse_mode: "Markdown",
+    });
     await saveData({ ...ton, ...dex, ...x, ...tg });
     console.log(`✅ Stats updated at ${fmtUTC(now)}`);
   } catch (err) {
