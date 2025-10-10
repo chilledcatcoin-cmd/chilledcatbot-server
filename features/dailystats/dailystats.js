@@ -12,22 +12,31 @@
 const axios = require("axios");
 const Redis = require("ioredis");
 
-const Redis = require("ioredis");
-
+/* ------------------- Redis Client ------------------- */
 const redis = new Redis(process.env.REDIS_URL, {
-  tls: {},                        // ensures Upstash uses TLS
-  reconnectOnError: () => true,   // always try to reconnect
-  retryStrategy: (times) => Math.min(times * 200, 5000), // back-off reconnect
-  maxRetriesPerRequest: null,     // keep trying
-  enableReadyCheck: false,        // faster re-init
+  tls: {},                          // secure TLS for Upstash
+  lazyConnect: true,                // connect only when needed
+  connectTimeout: 10000,            // 10 s connect timeout
+  enableOfflineQueue: true,         // queue commands during reconnect
+  maxRetriesPerRequest: null,       // no hard 20-retry limit
+  enableReadyCheck: false,          // faster startup
+  reconnectOnError: (err) => {
+    console.warn("[Redis] reconnectOnError:", err.code || err.message);
+    return true; // always reconnect
+  },
+  retryStrategy: (attempt) => {
+    const delay = Math.min(attempt * 500, 5000);
+    console.log(`[Redis] retrying connection in ${delay} ms`);
+    return delay;
+  },
 });
 
-redis.on("error", (err) => {
-  console.warn("[Redis] Connection warning:", err.message);
-});
 redis.on("connect", () => console.log("🔌 Redis connected"));
+redis.on("ready", () => console.log("✅ Redis ready"));
 redis.on("reconnecting", () => console.log("♻️ Redis reconnecting..."));
+redis.on("error", (err) => console.warn("[Redis] connection issue:", err.code || err.message));
 
+/* ------------------- Config ------------------- */
 const CHANNEL_ID = "@chilledcat";
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
@@ -80,12 +89,13 @@ async function loadPrevData() {
   const raw = await redis.get("chilledcat:stats");
   return raw ? JSON.parse(raw) : {};
 }
+
 async function saveData(data) {
   data.timestamp = new Date().toISOString();
   await redis.set("chilledcat:stats", JSON.stringify(data));
 }
 
-/* ------------------- Helper Functions ------------------- */
+/* ------------------- Helpers ------------------- */
 function diff(curr, prev, label, suffix = "") {
   if (prev === undefined) return `${label}: ${curr}${suffix}`;
   const delta = curr - prev;
@@ -113,8 +123,8 @@ async function postHourlyStats(bot) {
 🐾 *Chilled Cat Hourly Stats* 🐾
 
 💰 ${diff(dex.priceUsd, prev.priceUsd, "Price", " USD")}
-📉 ${diff(dex.priceChange24h, prev.priceChange24h, "24h Change", "%")}
-📊 ${diff(dex.volume24hUsd, prev.volume24hUsd, "Volume (24h)", " USD")}
+📉 ${diff(dex.priceChange24h, prev.priceChange24h, "24 h Change", "%")}
+📊 ${diff(dex.volume24hUsd, prev.volume24hUsd, "Volume (24 h)", " USD")}
 💦 ${diff(dex.liquidityUsd, prev.liquidityUsd, "Liquidity", " USD")}
 💎 ${diff(ton.balanceTon, prev.balanceTon, "Treasury Balance", " TON")}
 🧾 ${diff(ton.txCount, prev.txCount, "Recent TXs")}
