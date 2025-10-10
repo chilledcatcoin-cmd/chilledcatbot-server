@@ -232,24 +232,30 @@ async function loadPrevData() {
 
 async function saveData(data) {
   try {
-    // Always shallow-clone and convert nested values
-    const cleanObj = Object.fromEntries(
-      Object.entries(data).map(([k, v]) => {
-        if (v && typeof v === "object") {
-          try {
-            return [k, JSON.parse(JSON.stringify(v))];
-          } catch {
-            return [k, String(v)];
+    // 🔒 Deep-clean: remove undefined, circular refs, and non-JSON-safe fields
+    const safe = JSON.parse(
+      JSON.stringify(
+        data,
+        (key, value) => {
+          // skip functions and Telegraf bot/context objects
+          if (typeof value === "function") return undefined;
+          if (value && typeof value === "object" && value.constructor.name !== "Object") {
+            try {
+              // try to serialize plain data only
+              return JSON.parse(JSON.stringify(value));
+            } catch {
+              return undefined;
+            }
           }
+          return value;
         }
-        return [k, v];
-      })
+      )
     );
 
-    cleanObj.timestamp = new Date().toISOString();
+    safe.timestamp = new Date().toISOString();
 
-    const payload = JSON.stringify(cleanObj, null, 2);
-    console.log("💾 Saving snapshot to Upstash:\n", payload);
+    const payload = JSON.stringify(safe, null, 2);
+    console.log("💾 Safe payload ready for Upstash:\n", payload);
 
     await redis.set("chilledcat:stats", payload);
     console.log("✅ Redis save OK");
