@@ -43,34 +43,33 @@ async function getTonData() {
   });
   const balanceTon = Number(info.data.result.balance) / 1e9;
 
-  // ✅ Fetch token holders from TonAPI Jetton endpoint
   let holdersCount = 0;
   try {
+    const url = `https://tonapi.io/v2/jettons/${TOKEN_CA}/holders`;
+    console.log("🌐 Fetching holders from:", url);
+
     const headers = {};
     if (process.env.TONAPI_KEY) headers.Authorization = `Bearer ${process.env.TONAPI_KEY}`;
 
-    const res = await axios.get(
-      `https://tonapi.io/v2/jettons/${TOKEN_CA}/holders`,
-      { headers }
-    );
+    const res = await axios.get(url, { headers });
 
-    holdersCount = res.data.total || 0;
+    if (!res.data || typeof res.data.total === "undefined") {
+      throw new Error("Invalid TonAPI response");
+    }
+
+    holdersCount = res.data.total;
     console.log(`✅ Holders fetched: ${holdersCount}`);
   } catch (err) {
     console.warn("⚠️ TonAPI holders fetch failed:", err.response?.data || err.message);
 
-    // fallback to last cached value if API fails
     const cached = await redis.get("chilledcat:last_holders");
     holdersCount = cached ? Number(cached) : 0;
     if (holdersCount) console.log(`📦 Using cached holders: ${holdersCount}`);
   }
 
-  // Cache the current holder count for fallback
   await redis.set("chilledcat:last_holders", holdersCount);
-
   return { balanceTon, holdersCount };
 }
-
 
 async function getDexData() {
   const { data } = await axios.get(DEX_URL);
