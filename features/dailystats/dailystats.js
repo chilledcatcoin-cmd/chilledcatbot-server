@@ -14,11 +14,6 @@ const Redis = require("ioredis");
 const { Telegraf } = require("telegraf");
 const api = new Telegraf(process.env.BOT_TOKEN);
 
-async function getTelegramData(bot) {
-  const members = await api.telegram.getChatMemberCount(CHANNEL_ID);
-  return { telegramMembers: members };
-}
-
 /* ------------------- Redis Client ------------------- */
 const redis = new Redis(process.env.REDIS_URL, {
   tls: {},                          // secure TLS for Upstash
@@ -86,8 +81,9 @@ async function getXData() {
   return { followers: data.data.public_metrics.followers_count };
 }
 
-async function getTelegramData(bot) {
-  const members = await bot.telegram.getChatMemberCount(CHANNEL_ID);
+// ✅ fixed Telegram data fetcher
+async function getTelegramData() {
+  const members = await api.telegram.getChatMemberCount(CHANNEL_ID);
   return { telegramMembers: members };
 }
 
@@ -119,7 +115,7 @@ async function postHourlyStats(bot) {
       getTonData(),
       getDexData(),
       getXData(),
-      getTelegramData(bot),
+      getTelegramData(),
     ]);
 
     const prev = await loadPrevData();
