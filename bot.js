@@ -56,6 +56,7 @@ const { setupSafeCat } = require("./modules/safecat");
 const { setupGames } = require("./features/games");
 const { setupLeaderboard } = require("./features/leaderboard");
 const { setupContests } = require("./features/contests");
+const { initHourlyStats } = require("./features/dailystats");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("❌ Missing BOT_TOKEN in environment");
@@ -75,7 +76,8 @@ setupDuelFeature(bot);
 setupGames(bot);
 setupLeaderboard(bot);
 setupContests(bot);
+initHourlyStats(bot);
 
-console.log("✅ Commands, HowChill, Fortune, and Battle Royale loaded.");
+console.log("🚀 ChilledCatBot running.");
 
 module.exports = { bot };
