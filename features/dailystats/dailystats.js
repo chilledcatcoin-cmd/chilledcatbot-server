@@ -68,7 +68,7 @@ async function getTonData() {
     if (holdersCount) console.log(`📦 Using cached holders: ${holdersCount}`);
   }
 
-  await redis.set("chilledcat:last_holders", holdersCount);
+  await redis.set("chilledcat:last_holders", String(holdersCount));
   return { balanceTon, holdersCount };
 }
 
@@ -88,21 +88,24 @@ async function getDexData() {
       liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
     };
 
-    await redis.set("chilledcat:last_dex", JSON.stringify(result));
+    await redis.set("chilledcat:last_dex", Object.entries(result).map(([k, v]) => `${k}:${v}`).join(";"));
     return result;
   } catch (err) {
     console.warn("⚠️ Dexscreener fetch failed:", err.message);
     const cached = await redis.get("chilledcat:last_dex");
     if (cached) {
       console.log("📦 Using cached Dex data");
-      return JSON.parse(cached);
+      const obj = Object.fromEntries(
+        cached.split(";").map(p => p.split(":")).filter(a => a.length === 2)
+      );
+      return {
+        priceUsd: parseFloat(obj.priceUsd || 0),
+        priceChange24h: parseFloat(obj.priceChange24h || 0),
+        volume24hUsd: parseFloat(obj.volume24hUsd || 0),
+        liquidityUsd: parseFloat(obj.liquidityUsd || 0),
+      };
     }
-    return {
-      priceUsd: 0,
-      priceChange24h: 0,
-      volume24hUsd: 0,
-      liquidityUsd: 0,
-    };
+    return { priceUsd: 0, priceChange24h: 0, volume24hUsd: 0, liquidityUsd: 0 };
   }
 }
 
@@ -119,12 +122,11 @@ async function getTelegramData() {
       },
     });
 
-    // Works for members / subscribers / followers
-    const match = data.match(/(\d+(?:,\d+)*)\s+(members|subscribers|followers)/i);
+    const match = data.match(/(\d+(?:,\d+)*)\s+members/);
     if (match) {
       const telegramMembers = parseInt(match[1].replace(/,/g, ""));
       console.log(`👥 Scraped Telegram members: ${telegramMembers}`);
-      await redis.set("chilledcat:last_tg", telegramMembers);
+      await redis.set("chilledcat:last_tg", String(telegramMembers));
       return { telegramMembers };
     }
     throw new Error("No members found");
@@ -137,7 +139,7 @@ async function getTelegramData() {
 }
 
 // =====================================================
-// 🐦 X / Twitter Scraper with mirror + fallback
+// 🐦 X / Twitter Scraper with mirror fallback
 // =====================================================
 let lastXCheck = 0;
 async function getXData() {
@@ -145,7 +147,7 @@ async function getXData() {
   if (now - lastXCheck < 5 * 60 * 1000) {
     console.log("🕒 Skipping X fetch (cached <5m)");
     const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) return JSON.parse(cached);
+    if (cached) return { followers: Number(cached) || 0 };
   }
 
   const mirrors = [
@@ -166,20 +168,13 @@ async function getXData() {
         },
       });
 
-      const match = data.match(/Followers<\/span>\s*<span class="profile-stat-num">([\d.,KkMm]+)/i);
+      const match = data.match(/Followers<\/span>\s*<span class="profile-stat-num">([\d,]+)/i);
       if (match) {
-        let followersText = match[1].trim();
-        // Handle K / M shorthand (e.g., 12.3K, 1.2M)
-        let followers = 0;
-        if (/k$/i.test(followersText)) followers = parseFloat(followersText) * 1_000;
-        else if (/m$/i.test(followersText)) followers = parseFloat(followersText) * 1_000_000;
-        else followers = parseInt(followersText.replace(/,/g, ""));
-
+        const followers = parseInt(match[1].replace(/,/g, ""));
         console.log(`🐦 Followers from ${base}: ${followers}`);
-        const result = { followers: Math.round(followers) };
-        await redis.set("chilledcat:last_x_data", JSON.stringify(result));
+        await redis.set("chilledcat:last_x_data", String(followers));
         lastXCheck = now;
-        return result;
+        return { followers };
       }
     } catch (err) {
       console.warn(`⚠️ Nitter mirror failed (${base}): ${err.message}`);
@@ -187,21 +182,9 @@ async function getXData() {
     }
   }
 
-  // Last resort fallback: SocialCounts.org
-  try {
-    const res = await axios.get("https://api.socialcounts.org/twitter-user/ChilledCatCoin");
-    const followers = res.data.user?.followers || 0;
-    console.log(`🪶 Fallback follower count: ${followers}`);
-    const result = { followers };
-    await redis.set("chilledcat:last_x_data", JSON.stringify(result));
-    return result;
-  } catch (err) {
-    console.warn("⚠️ Fallback fetch failed:", err.message);
-  }
-
-  console.warn("⚠️ All sources failed — using cached data");
+  console.warn("⚠️ All Nitter mirrors failed — using cached data");
   const cached = await redis.get("chilledcat:last_x_data");
-  if (cached) return JSON.parse(cached);
+  if (cached) return { followers: Number(cached) || 0 };
   return { followers: 0 };
 }
 
@@ -212,18 +195,8 @@ async function loadPrevData() {
   try {
     const raw = await redis.get("chilledcat:stats");
     if (!raw) return {};
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return {
-      priceUsd: 0,
-      priceChange24h: 0,
-      volume24hUsd: 0,
-      liquidityUsd: 0,
-      balanceTon: 0,
-      holdersCount: 0,
-      telegramMembers: 0,
-      followers: 0,
-      ...parsed,
-    };
+    console.log("📦 Loaded raw previous data (text mode):", raw.slice(0, 80) + "...");
+    return {};
   } catch (err) {
     console.error("⚠️ Redis load error:", err.message);
     return {};
@@ -232,32 +205,20 @@ async function loadPrevData() {
 
 async function saveData(data) {
   try {
-    const now = new Date().toISOString();
+    const timestamp = new Date().toISOString();
+    let payload = "🐾 ChilledCat Stats Snapshot\n==========================\n";
+    for (const [key, value] of Object.entries(data)) {
+      payload += `${key}: ${value}\n`;
+    }
+    payload += `--------------------------\nTimestamp: ${timestamp}`;
 
-    // Format a clean text block instead of JSON
-    const lines = [
-      `🕒 Timestamp: ${now}`,
-      `💰 Price USD: ${data.priceUsd ?? "?"}`,
-      `📈 24h Change: ${data.priceChange24h ?? "?"}`,
-      `💧 Liquidity: ${data.liquidityUsd ?? "?"}`,
-      `📊 Volume 24h: ${data.volume24hUsd ?? "?"}`,
-      `🐾 Holders: ${data.holdersCount ?? "?"}`,
-      `👥 Telegram Members: ${data.telegramMembers ?? "?"}`,
-      `🐦 X Followers: ${data.followers ?? "?"}`,
-    ];
-
-    const payload = lines.join("\n");
-    console.log("💾 Saving plain-text snapshot to Upstash:\n", payload);
-
-    // Save as a simple string
+    console.log("💾 Saving plain-text snapshot:\n", payload);
     await redis.set("chilledcat:stats", payload);
-
-    console.log("✅ Redis save OK (plain text)");
+    console.log("✅ Redis save OK (plain-text mode)");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
   }
 }
-
 
 // =====================================================
 // 🚀 MAIN FUNCTION
@@ -288,6 +249,7 @@ async function postHourlyStats(bot) {
       ...x,
       ...tg,
     };
+
     await saveData(statsData);
 
     const imgPath = await generateStatsCard({
