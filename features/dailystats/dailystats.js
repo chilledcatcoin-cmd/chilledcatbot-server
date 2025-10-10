@@ -4,48 +4,26 @@
  * =====================================================
  * Handles:
  *  - Fetching data from TONCenter, Dexscreener, X, Telegram
- *  - Reading/writing data in Redis
+ *  - Reading/writing data in Upstash Redis (HTTP client)
  *  - Formatting and posting messages
  * =====================================================
  */
 
 const axios = require("axios");
-const Redis = require("ioredis");
+const { Redis } = require("@upstash/redis");
 
 /* ------------------- Redis Client ------------------- */
-const redis = new Redis(process.env.REDIS_URL, {
-  tls: {},
-  lazyConnect: true,
-  connectTimeout: 10000,
-  enableOfflineQueue: true,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  reconnectOnError: (err) => {
-    console.warn("[Redis] reconnectOnError:", err.code || err.message);
-    return true;
-  },
-  retryStrategy: (attempt) => {
-    const delay = Math.min(attempt * 500, 5000);
-    console.log(`[Redis] retrying connection in ${delay} ms`);
-    return delay;
-  },
+const redis = new Redis({
+  url: process.env.UPSTASH_URL,
+  token: process.env.UPSTASH_TOKEN,
 });
 
-redis.on("connect", () => console.log("🔌 Redis connected"));
-redis.on("ready", () => console.log("✅ Redis ready"));
-redis.on("reconnecting", () => console.log("♻️ Redis reconnecting..."));
-redis.on("error", (err) =>
-  console.warn("[Redis] connection issue:", err.code || err.message)
-);
+console.log("🔌 Using Upstash Redis HTTP client");
 
 /* ------------------- Config ------------------- */
-// Channel where stats are posted
-const CHANNEL_ID = "@chilledcat";
-// Group where member count is measured
-const TELEGRAM_STATS_CHAT = "-4873969981"; // Chilled Cat Testing group
-
-const TOKEN_CA =
-  "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
+const CHANNEL_ID = "@chilledcat"; // where stats are posted
+const TELEGRAM_STATS_CHAT = "-4873969981"; // Chilled Cat Testing group for member counts
+const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
 const X_USER_ID = "1891578650074370048"; // @ChilledCatCoin
@@ -86,7 +64,6 @@ async function getXData() {
   return { followers: data.data.public_metrics.followers_count };
 }
 
-// ✅ Webhook-safe Telegram data fetcher
 async function getTelegramData() {
   try {
     const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
@@ -99,7 +76,6 @@ async function getTelegramData() {
   }
 }
 
-
 /* ------------------- Redis Helpers ------------------- */
 async function loadPrevData() {
   const raw = await redis.get("chilledcat:stats");
@@ -108,6 +84,7 @@ async function loadPrevData() {
 
 async function saveData(data) {
   data.timestamp = new Date().toISOString();
+  console.log("💾 Saving stats to Redis:", JSON.stringify(data, null, 2));
   await redis.set("chilledcat:stats", JSON.stringify(data));
 }
 
@@ -119,13 +96,13 @@ function diff(curr, prev, label, suffix = "") {
   const sign = delta > 0 ? "+" : "";
   return `${label}: ${curr}${suffix} (${arrow} ${sign}${delta.toFixed(2)}${suffix})`;
 }
-const fmtUTC = (d) =>
-  d.toISOString().replace("T", " ").split(".")[0] + " UTC";
+
+const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
 /* ------------------- Main Post Function ------------------- */
 async function postHourlyStats(bot) {
   try {
-    // sequential fetches with small delays to avoid 429s
+    // sequential fetches with small delays to avoid rate limits
     const ton = await getTonData();
     await new Promise((r) => setTimeout(r, 500));
     const dex = await getDexData();
@@ -154,9 +131,7 @@ async function postHourlyStats(bot) {
 🕒 *Next Update:* ${fmtUTC(next)}
 `;
 
-    await bot.telegram.sendMessage(CHANNEL_ID, msg, {
-      parse_mode: "Markdown",
-    });
+    await bot.telegram.sendMessage(CHANNEL_ID, msg, { parse_mode: "Markdown" });
     await saveData({ ...ton, ...dex, ...x, ...tg });
     console.log(`✅ Stats updated at ${fmtUTC(now)}`);
   } catch (err) {

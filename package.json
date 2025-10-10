@@ -1,15 +1,19 @@
 {
   "name": "chilledcatbot-server",
   "version": "1.0.0",
-  "description": "Chilled Cat Telegram Bot",
+  "description": "Chilled Cat Telegram Bot — featuring games, contests, etc.",
   "main": "index.js",
+  "type": "commonjs",
   "license": "MIT",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
-    "telegraf": "^4.15.3",
-    "express": "^4.19.2",
-    "dotenv": "^16.4.5",
     "axios": "^1.7.2",
-    "ioredis": "^5.4.1",
-    "node-cron": "^3.0.3"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "telegraf": "^4.15.3",
+    "@upstash/redis": "^1.28.4"
   }
 }
