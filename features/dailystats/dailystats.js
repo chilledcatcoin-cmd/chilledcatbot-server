@@ -8,6 +8,8 @@
  */
 
 const axios = require("axios");
+const OAuth = require("oauth-1.0a");
+const crypto = require("crypto");
 const { Redis } = require("@upstash/redis");
 const { generateStatsCard } = require("./canvas");
 
@@ -131,8 +133,24 @@ async function getTelegramData() {
 }
 
 /**
- * X / Twitter followers — cached to avoid rate limit 429
+ * X / Twitter followers — OAuth 1.0a (user context, avoids app limit)
  */
+const oauth = OAuth({
+  consumer: {
+    key: process.env.X_CONSUMER_KEY,
+    secret: process.env.X_CONSUMER_SECRET,
+  },
+  signature_method: "HMAC-SHA1",
+  hash_function(base, key) {
+    return crypto.createHmac("sha1", key).update(base).digest("base64");
+  },
+});
+
+const xToken = {
+  key: process.env.X_ACCESS_TOKEN,
+  secret: process.env.X_ACCESS_SECRET,
+};
+
 let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
@@ -143,18 +161,23 @@ async function getXData() {
   }
 
   try {
-    const BEARER = process.env.X_BEARER;
-    const url = `https://api.x.com/2/users/${X_USER_ID}?user.fields=public_metrics`;
-    const { data } = await axios.get(url, {
-      headers: { Authorization: `Bearer ${BEARER}` },
+    const url = "https://api.x.com/1.1/users/show.json";
+    const requestData = { url, method: "GET", data: { screen_name: "ChilledCatCoin" } };
+    const authHeader = oauth.toHeader(oauth.authorize(requestData, xToken));
+
+    const res = await axios.get(url, {
+      params: { screen_name: "ChilledCatCoin" },
+      headers: { Authorization: authHeader.Authorization },
     });
 
-    const result = { followers: data.data.public_metrics.followers_count };
+    const followers = res.data.followers_count;
+    const result = { followers };
     await redis.set("chilledcat:last_x_data", JSON.stringify(result));
     lastXCheck = now;
+    console.log(`✅ X followers fetched: ${followers}`);
     return result;
   } catch (err) {
-    console.warn("⚠️ X API fetch failed:", err.response?.data || err.message);
+    console.warn("⚠️ X OAuth fetch failed:", err.response?.data || err.message);
     const cached = await redis.get("chilledcat:last_x_data");
     if (cached) {
       console.log("📦 Using cached X data");
@@ -163,6 +186,7 @@ async function getXData() {
     return { followers: 0 };
   }
 }
+
 
 // =====================================================
 // 🧱 REDIS HELPERS
