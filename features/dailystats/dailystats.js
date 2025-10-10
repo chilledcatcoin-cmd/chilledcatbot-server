@@ -232,18 +232,32 @@ async function loadPrevData() {
 
 async function saveData(data) {
   try {
-    data.timestamp = new Date().toISOString();
+    // Always shallow-clone and convert nested values
+    const cleanObj = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => {
+        if (v && typeof v === "object") {
+          try {
+            return [k, JSON.parse(JSON.stringify(v))];
+          } catch {
+            return [k, String(v)];
+          }
+        }
+        return [k, v];
+      })
+    );
 
-    // ensure safe serialization
-    const safeData = JSON.parse(JSON.stringify(data));
+    cleanObj.timestamp = new Date().toISOString();
 
-    console.log("💾 Saving snapshot to Upstash:\n", safeData);
-    await redis.set("chilledcat:stats", JSON.stringify(safeData));
+    const payload = JSON.stringify(cleanObj, null, 2);
+    console.log("💾 Saving snapshot to Upstash:\n", payload);
+
+    await redis.set("chilledcat:stats", payload);
     console.log("✅ Redis save OK");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
   }
 }
+
 
 // =====================================================
 // 🚀 MAIN FUNCTION
