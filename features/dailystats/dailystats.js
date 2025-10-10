@@ -232,47 +232,31 @@ async function loadPrevData() {
 
 async function saveData(data) {
   try {
-    console.log("🧩 Raw data before cleaning:", data);
+    const now = new Date().toISOString();
 
-    // Step 1: Deep-clean everything
-    const cleaned = {};
-    for (const [key, value] of Object.entries(data)) {
-      try {
-        if (value === undefined) continue;
-        if (typeof value === "object") {
-          cleaned[key] = JSON.parse(JSON.stringify(value));
-        } else {
-          cleaned[key] = value;
-        }
-      } catch (err) {
-        console.warn(`⚠️ Could not clean field '${key}':`, err.message);
-        cleaned[key] = String(value);
-      }
-    }
+    // Format a clean text block instead of JSON
+    const lines = [
+      `🕒 Timestamp: ${now}`,
+      `💰 Price USD: ${data.priceUsd ?? "?"}`,
+      `📈 24h Change: ${data.priceChange24h ?? "?"}`,
+      `💧 Liquidity: ${data.liquidityUsd ?? "?"}`,
+      `📊 Volume 24h: ${data.volume24hUsd ?? "?"}`,
+      `🐾 Holders: ${data.holdersCount ?? "?"}`,
+      `👥 Telegram Members: ${data.telegramMembers ?? "?"}`,
+      `🐦 X Followers: ${data.followers ?? "?"}`,
+    ];
 
-    // Step 2: Add timestamp
-    cleaned.timestamp = new Date().toISOString();
+    const payload = lines.join("\n");
+    console.log("💾 Saving plain-text snapshot to Upstash:\n", payload);
 
-    // Step 3: Verify we can stringify
-    let payload;
-    try {
-      payload = JSON.stringify(cleaned, null, 2);
-    } catch (err) {
-      console.error("❌ JSON.stringify failed! Falling back to stringified object dump.");
-      payload = String(cleaned);
-    }
+    // Save as a simple string
+    await redis.set("chilledcat:stats", payload);
 
-    console.log("💾 Final sanitized payload:", payload);
-
-    // Step 4: Always send a string to Redis
-    await redis.set("chilledcat:stats", String(payload));
-
-    console.log("✅ Redis save OK");
+    console.log("✅ Redis save OK (plain text)");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
   }
 }
-
 
 
 // =====================================================
