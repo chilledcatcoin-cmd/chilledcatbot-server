@@ -1,18 +1,13 @@
 /**
  * =====================================================
- * Chilled Cat Stats Engine (Core Logic)
- * =====================================================
- * Handles:
- *  - Fetching data from TONCenter, Dexscreener, X, Telegram
- *  - Reading/writing data in Upstash Redis (HTTP client)
- *  - Formatting and posting messages
+ * Chilled Cat Stats Engine (Upstash + Telegram)
  * =====================================================
  */
 
 const axios = require("axios");
 const { Redis } = require("@upstash/redis");
 
-/* ------------------- Redis Client ------------------- */
+// ✅ Initialize Upstash Redis (HTTP, not TCP)
 const redis = new Redis({
   url: process.env.UPSTASH_URL,
   token: process.env.UPSTASH_TOKEN,
@@ -20,28 +15,15 @@ const redis = new Redis({
 
 console.log("🔌 Using Upstash Redis HTTP client");
 
-/* ------------------- Config ------------------- */
-const CHANNEL_ID = "@chilledcat"; // where stats are posted
-const TELEGRAM_STATS_CHAT = "-4873969981"; // Chilled Cat Testing group for member counts
+// ------------------- CONFIG -------------------
+const CHANNEL_ID = "@chilledcat";
+const TELEGRAM_STATS_CHAT = "-4873969981";
 const TOKEN_CA = "EQAwHA3KhihRIsKKWlJmw7ixrA3FJ4gZv3ialOZBVcl2Olpd";
 const DEX_URL =
   "https://api.dexscreener.com/latest/dex/pairs/ton/eqaunzdf_szbp6b39_1gcddtatwnfabert8yupoct3wxgbdt";
 const X_USER_ID = "1891578650074370048"; // @ChilledCatCoin
 
-/* ------------------- Fetchers ------------------- */
-async function getTonData() {
-  const base = "https://toncenter.com/api/v2";
-  const { data: info } = await axios.get(`${base}/getAddressInformation`, {
-    params: { address: TOKEN_CA },
-  });
-  const { data: txs } = await axios.get(`${base}/getTransactions`, {
-    params: { address: TOKEN_CA, limit: 100 },
-  });
-  const balanceTon = Number(info.result.balance) / 1e9;
-  const txCount = txs.result?.length || 0;
-  return { balanceTon, txCount };
-}
-
+// ------------------- FETCHERS -------------------
 async function getDexData() {
   const { data } = await axios.get(DEX_URL);
   const pair = data.pairs?.[0];
@@ -52,16 +34,6 @@ async function getDexData() {
     volume24hUsd: parseFloat(pair.volume.h24),
     liquidityUsd: parseFloat(pair.liquidity.usd),
   };
-}
-
-async function getXData() {
-  const BEARER = process.env.X_BEARER;
-  if (!BEARER) throw new Error("Missing X_BEARER token");
-  const url = `https://api.x.com/2/users/${X_USER_ID}?user.fields=public_metrics`;
-  const { data } = await axios.get(url, {
-    headers: { Authorization: `Bearer ${BEARER}` },
-  });
-  return { followers: data.data.public_metrics.followers_count };
 }
 
 async function getTelegramData() {
@@ -76,19 +48,30 @@ async function getTelegramData() {
   }
 }
 
-/* ------------------- Redis Helpers ------------------- */
+// ------------------- REDIS HELPERS -------------------
 async function loadPrevData() {
-  const raw = await redis.get("chilledcat:stats");
-  return raw ? JSON.parse(raw) : {};
+  try {
+    const raw = await redis.get("chilledcat:stats");
+    if (!raw) return {};
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch (err) {
+    console.error("⚠️ Redis load error:", err.message);
+    return {};
+  }
 }
 
 async function saveData(data) {
-  data.timestamp = new Date().toISOString();
-  console.log("💾 Saving stats to Redis:", JSON.stringify(data, null, 2));
-  await redis.set("chilledcat:stats", JSON.stringify(data));
+  try {
+    data.timestamp = new Date().toISOString();
+    console.log("💾 Saving stats to Upstash...");
+    const result = await redis.set("chilledcat:stats", JSON.stringify(data));
+    console.log("✅ Upstash set result:", result);
+  } catch (err) {
+    console.error("❌ Upstash save error:", err.message);
+  }
 }
 
-/* ------------------- Helpers ------------------- */
+// ------------------- HELPERS -------------------
 function diff(curr, prev, label, suffix = "") {
   if (prev === undefined) return `${label}: ${curr}${suffix}`;
   const delta = curr - prev;
@@ -99,19 +82,13 @@ function diff(curr, prev, label, suffix = "") {
 
 const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
-/* ------------------- Main Post Function ------------------- */
+// ------------------- MAIN FUNCTION -------------------
 async function postHourlyStats(bot) {
   try {
-    // sequential fetches with small delays to avoid rate limits
-    const ton = await getTonData();
-    await new Promise((r) => setTimeout(r, 500));
     const dex = await getDexData();
-    await new Promise((r) => setTimeout(r, 500));
-    const x = await getXData();
-    await new Promise((r) => setTimeout(r, 500));
     const tg = await getTelegramData();
-
     const prev = await loadPrevData();
+
     const now = new Date();
     const next = new Date(now.getTime() + 60 * 60 * 1000);
 
@@ -122,17 +99,14 @@ async function postHourlyStats(bot) {
 📉 ${diff(dex.priceChange24h, prev.priceChange24h, "24 h Change", "%")}
 📊 ${diff(dex.volume24hUsd, prev.volume24hUsd, "Volume (24 h)", " USD")}
 💦 ${diff(dex.liquidityUsd, prev.liquidityUsd, "Liquidity", " USD")}
-💎 ${diff(ton.balanceTon, prev.balanceTon, "Treasury Balance", " TON")}
-🧾 ${diff(ton.txCount, prev.txCount, "Recent TXs")}
 👥 ${diff(tg.telegramMembers, prev.telegramMembers, "Telegram Members")}
-🐦 ${diff(x.followers, prev.followers, "X Followers")}
 
 ⏰ *Last Updated:* ${fmtUTC(now)}
 🕒 *Next Update:* ${fmtUTC(next)}
 `;
 
+    await saveData({ ...dex, ...tg });
     await bot.telegram.sendMessage(CHANNEL_ID, msg, { parse_mode: "Markdown" });
-    await saveData({ ...ton, ...dex, ...x, ...tg });
     console.log(`✅ Stats updated at ${fmtUTC(now)}`);
   } catch (err) {
     console.error("❌ Stats update error:", err.message);
