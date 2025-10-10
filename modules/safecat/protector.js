@@ -182,7 +182,20 @@ function isWhitelisted(userId) {
   );
 }
 
+async function canAccess(userId) {
+  if (!userId) return false;
+
+  const ownerId = (process.env.OWNER_ID || "").toString();
+  loadWhitelist();
+
+  return (
+    userId.toString() === ownerId ||
+    whitelist.users.map(String).includes(userId.toString())
+  );
+}
+
 module.exports = {
   setupProtector,
   isWhitelisted,
+  canAccess,
 };
