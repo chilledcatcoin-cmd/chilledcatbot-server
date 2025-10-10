@@ -91,13 +91,14 @@ async function getTelegramData() {
   try {
     const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChatMemberCount?chat_id=${TELEGRAM_STATS_CHAT}`;
     const { data } = await axios.get(url);
-    if (!data.ok) throw new Error("Telegram API error");
+    if (!data.ok) throw new Error(JSON.stringify(data));
     return { telegramMembers: data.result };
   } catch (err) {
-    console.warn("⚠️ Telegram member fetch failed:", err.message);
+    console.warn("⚠️ Telegram member fetch failed:", err.response?.data || err.message);
     return { telegramMembers: 0 };
   }
 }
+
 
 /* ------------------- Redis Helpers ------------------- */
 async function loadPrevData() {
