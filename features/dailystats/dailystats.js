@@ -43,10 +43,34 @@ async function getTonData() {
   });
   const balanceTon = Number(info.data.result.balance) / 1e9;
 
-  const { holdersCount } = await getHolderData();
+  // ✅ Fetch token holders from TonAPI Jetton endpoint
+  let holdersCount = 0;
+  try {
+    const headers = {};
+    if (process.env.TONAPI_KEY) headers.Authorization = `Bearer ${process.env.TONAPI_KEY}`;
+
+    const res = await axios.get(
+      `https://tonapi.io/v2/jettons/${TOKEN_CA}/holders`,
+      { headers }
+    );
+
+    holdersCount = res.data.total || 0;
+    console.log(`✅ Holders fetched: ${holdersCount}`);
+  } catch (err) {
+    console.warn("⚠️ TonAPI holders fetch failed:", err.response?.data || err.message);
+
+    // fallback to last cached value if API fails
+    const cached = await redis.get("chilledcat:last_holders");
+    holdersCount = cached ? Number(cached) : 0;
+    if (holdersCount) console.log(`📦 Using cached holders: ${holdersCount}`);
+  }
+
+  // Cache the current holder count for fallback
+  await redis.set("chilledcat:last_holders", holdersCount);
 
   return { balanceTon, holdersCount };
 }
+
 
 async function getDexData() {
   const { data } = await axios.get(DEX_URL);
