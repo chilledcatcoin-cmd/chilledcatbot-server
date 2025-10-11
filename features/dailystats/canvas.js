@@ -125,12 +125,27 @@ async function generateStatsCard(data) {
   ctx.fillText(`Last Updated: ${time} UTC`, 70, 560);
 
   /* -------------------------------
-     💾 Output
+     💾 Output (cross-platform safe)
      ------------------------------- */
-  const outPath = path.join(mediaDir, "snapshot_dark.png");
-  fs.writeFileSync(outPath, canvas.toBuffer("image/png"));
-  console.log(`🌑 Dark-mode stats card saved → ${outPath}`);
+  let outDir;
+  if (process.env.RENDER || process.env.K_SERVICE || process.env.FLY_APP_NAME) {
+    outDir = "/tmp";
+  } else {
+    outDir = path.join(__dirname, "media");
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  }
+
+  const outPath = path.join(outDir, "snapshot_dark.png");
+
+  try {
+    fs.writeFileSync(outPath, canvas.toBuffer("image/png"));
+    console.log(`🌑 Dark-mode stats card saved → ${outPath}`);
+  } catch (err) {
+    console.error("❌ Failed to save canvas image:", err.message);
+  }
+
   return outPath;
 }
 
+/* ✅ Correct export */
 module.exports = { generateStatsCard };
