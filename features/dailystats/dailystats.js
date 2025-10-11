@@ -2,7 +2,7 @@
  * =====================================================
  * Chilled Cat Stats Engine (Upstash + Telegram + Hyperlinks)
  * =====================================================
- *  - Dexscreener + TONCenter + TonViewer + X (scraper) + Telegram (scraper)
+ *  - Dexscreener + TONCenter + TonViewer + X (Google/DuckDuckGo scraper)
  *  - Cached API calls + Upstash persistence
  *  - No external API tokens required for X/Telegram
  * =====================================================
@@ -88,37 +88,29 @@ async function getDexData() {
       liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
     };
 
-    await redis.set("chilledcat:last_dex", Object.entries(result).map(([k, v]) => `${k}:${v}`).join(";"));
+    await redis.set("chilledcat:last_dex", JSON.stringify(result));
     return result;
   } catch (err) {
     console.warn("⚠️ Dexscreener fetch failed:", err.message);
     const cached = await redis.get("chilledcat:last_dex");
     if (cached) {
       console.log("📦 Using cached Dex data");
-      const obj = Object.fromEntries(
-        cached.split(";").map(p => p.split(":")).filter(a => a.length === 2)
-      );
-      return {
-        priceUsd: parseFloat(obj.priceUsd || 0),
-        priceChange24h: parseFloat(obj.priceChange24h || 0),
-        volume24hUsd: parseFloat(obj.volume24hUsd || 0),
-        liquidityUsd: parseFloat(obj.liquidityUsd || 0),
-      };
+      return JSON.parse(cached);
     }
     return { priceUsd: 0, priceChange24h: 0, volume24hUsd: 0, liquidityUsd: 0 };
   }
 }
 
-// =====================================================
-// 👥 Telegram Scraper
-// =====================================================
+/**
+ * Telegram members (HTML scraper)
+ */
 async function getTelegramData() {
   try {
     const url = LINKS.telegram;
     const { data } = await axios.get(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
       },
     });
 
@@ -129,7 +121,7 @@ async function getTelegramData() {
       await redis.set("chilledcat:last_tg", String(telegramMembers));
       return { telegramMembers };
     }
-    throw new Error("No members found");
+    throw new Error("No members found in HTML");
   } catch (err) {
     console.warn("⚠️ Telegram scrape failed:", err.message);
     const cached = await redis.get("chilledcat:last_tg");
@@ -138,164 +130,95 @@ async function getTelegramData() {
   }
 }
 
-// =====================================================
-// 🐦 X / Twitter Scraper with mirror fallback
-// =====================================================
+/**
+ * X Followers — Google + DuckDuckGo fallback
+ */
 let lastXCheck = 0;
-
 async function getXData() {
   const now = Date.now();
 
-  // cache for 5 minutes
+  // Cache for 5 minutes
   if (now - lastXCheck < 5 * 60 * 1000) {
     const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) return { followers: Number(cached) || 0 };
+    if (cached) {
+      console.log("🕒 Using cached X data (<5m old)");
+      return { followers: Number(cached) || 0 };
+    }
   }
 
-  const mirrors = [
-    "https://nitter.net",
-    "https://nitter.poast.org",
-    "https://nitter.privacydev.net",
-    "https://nitter.1d4.us",
-    "https://nitter.moomoo.me",
-  ];
+  let followers = 0;
 
-  for (const base of mirrors) {
-    const url = `${base}/ChilledCatCoin`;
-    console.log(`🌐 Trying Nitter mirror (HTML): ${url}`);
-
-    try {
-      const { data } = await axios.get(url, {
+  // 1️⃣ Google Search
+  try {
+    console.log("🔍 Trying Google Search for followers...");
+    const { data } = await axios.get(
+      "https://www.google.com/search?q=ChilledCatCoin+site:x.com",
+      {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
         },
         timeout: 10000,
-      });
+      }
+    );
 
-      // 🧩 Match HTML follower count
-      let match = data.match(
-        /<li class="followers">\s*<span[^>]*>Followers<\/span>\s*<span[^>]*class="profile-stat-num">([\d,]+)/i
+    const match = data.match(/([\d,]+)\s*Followers/i);
+    if (match) {
+      followers = parseInt(match[1].replace(/,/g, ""));
+      console.log(`✅ Found via Google: ${followers} followers`);
+    } else {
+      console.warn("⚠️ Google returned no follower match");
+    }
+  } catch (err) {
+    console.warn(`⚠️ Google search failed: ${err.message}`);
+  }
+
+  // 2️⃣ DuckDuckGo fallback
+  if (!followers) {
+    try {
+      console.log("🦆 Trying DuckDuckGo fallback...");
+      const { data } = await axios.get(
+        "https://duckduckgo.com/html/?q=ChilledCatCoin+site:x.com",
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
+          },
+          timeout: 10000,
+        }
       );
-      if (!match)
-        match =
-          data.match(/profile-stat-num">([\d,]+)<\/span>\s*<span[^>]*>Followers/i) ||
-          data.match(/Followers<\/span>\s*<span[^>]*class="profile-stat-num">([\d,]+)/i);
 
+      const match = data.match(/([\d,]+)\s*Followers/i);
       if (match) {
-        const followers = parseInt(match[1].replace(/,/g, ""));
-        console.log(`🐦 Followers from ${base}: ${followers}`);
-        await redis.set("chilledcat:last_x_data", String(followers));
-        await redis.set("chilledcat:last_nitter", base);
-        lastXCheck = now;
-        return { followers };
-      }
-
-      console.warn(`⚠️ No followers found in HTML on ${base}`);
-    } catch (err) {
-      console.warn(`⚠️ HTML fetch failed (${base}): ${err.message}`);
-    }
-
-    // 📰 Try RSS fallback
-    const rssUrl = `${base}/ChilledCatCoin/rss`;
-    console.log(`📰 Trying Nitter RSS: ${rssUrl}`);
-
-    try {
-      const { data: rss } = await axios.get(rssUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
-        },
-        timeout: 10000,
-      });
-
-      if (rss.includes("<rss")) {
-        console.log(`✅ RSS feed reachable for ${base} (HTML blocked, but feed works)`);
-        const cached = await redis.get("chilledcat:last_x_data");
-        return { followers: Number(cached) || 0 };
+        followers = parseInt(match[1].replace(/,/g, ""));
+        console.log(`✅ Found via DuckDuckGo: ${followers} followers`);
+      } else {
+        console.warn("⚠️ DuckDuckGo returned no follower match");
       }
     } catch (err) {
-      console.warn(`⚠️ RSS fallback failed (${base}): ${err.message}`);
+      console.warn(`⚠️ DuckDuckGo scrape failed: ${err.message}`);
     }
   }
 
-  // 🦆 DuckDuckGo fallback
-  try {
-    console.log("🦆 Trying DuckDuckGo cached search...");
-    const { data } = await axios.get(
-      "https://duckduckgo.com/html/?q=ChilledCatCoin+site:nitter.net",
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
-        },
-        timeout: 10000,
-      }
-    );
-
-    const match = data.match(/([\d,]+)\s+Followers/i);
-    if (match) {
-      const followers = parseInt(match[1].replace(/,/g, ""));
-      console.log(`🦆 Followers via DuckDuckGo cache: ${followers}`);
-      await redis.set("chilledcat:last_x_data", String(followers));
-      return { followers };
+  // 3️⃣ Cache fallback
+  if (!followers) {
+    const cached = await redis.get("chilledcat:last_x_data");
+    if (cached) {
+      followers = Number(cached) || 0;
+      console.log(`📦 Using cached followers: ${followers}`);
+    } else {
+      console.warn("⚠️ No cached follower data available");
     }
-  } catch (err) {
-    console.warn(`⚠️ DuckDuckGo fallback failed: ${err.message}`);
   }
 
-  // 🔍 Google Cache fallback
-  try {
-    console.log("🔍 Trying Google text cache...");
-    const { data } = await axios.get(
-      "https://webcache.googleusercontent.com/search?q=ChilledCatCoin+site:nitter.net",
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
-        },
-        timeout: 10000,
-      }
-    );
-
-    const match = data.match(/([\d,]+)\s+Followers/i);
-    if (match) {
-      const followers = parseInt(match[1].replace(/,/g, ""));
-      console.log(`🔍 Followers via Google cache: ${followers}`);
-      await redis.set("chilledcat:last_x_data", String(followers));
-      return { followers };
-    }
-  } catch (err) {
-    console.warn(`⚠️ Google cache fallback failed: ${err.message}`);
-  }
-
-  // 🧩 Fallback to cache
-  const cached = await redis.get("chilledcat:last_x_data");
-  if (cached) {
-    console.warn("⚠️ All sources failed, using cached followers");
-    return { followers: Number(cached) || 0 };
-  }
-
-  console.warn("🚫 Could not retrieve followers from any source.");
-  return { followers: 0 };
+  await redis.set("chilledcat:last_x_data", String(followers));
+  lastXCheck = now;
+  return { followers };
 }
 
-
 // =====================================================
-// 🧱 REDIS HELPERS
+// 🧱 REDIS SAVE + HELPERS
 // =====================================================
-async function loadPrevData() {
-  try {
-    const raw = await redis.get("chilledcat:stats");
-    if (!raw) return {};
-    console.log("📦 Loaded raw previous data (text mode):", raw.slice(0, 80) + "...");
-    return {};
-  } catch (err) {
-    console.error("⚠️ Redis load error:", err.message);
-    return {};
-  }
-}
-
 async function saveData(data) {
   try {
     const timestamp = new Date().toISOString();
@@ -304,25 +227,19 @@ async function saveData(data) {
       payload += `${key}: ${value}\n`;
     }
     payload += `--------------------------\nTimestamp: ${timestamp}`;
-
-    console.log("💾 Saving plain-text snapshot:\n", payload);
+    console.log("💾 Saving snapshot:\n", payload);
     await redis.set("chilledcat:stats", payload);
-    console.log("✅ Redis save OK (plain-text mode)");
+    console.log("✅ Redis save OK");
   } catch (err) {
     console.error("❌ Redis save error:", err.message);
   }
 }
 
-// =====================================================
-// 🚀 MAIN FUNCTION
-// =====================================================
-function clean(value, decimals = 2) {
-  if (value === null || isNaN(value)) return "—";
-  return Number(value).toFixed(decimals);
-}
-
 const fmtUTC = (d) => d.toISOString().replace("T", " ").split(".")[0] + " UTC";
 
+// =====================================================
+// 🚀 MAIN POST FUNCTION
+// =====================================================
 async function postHourlyStats(bot) {
   try {
     console.log("🚀 Fetching all Chilled Cat stats...");
