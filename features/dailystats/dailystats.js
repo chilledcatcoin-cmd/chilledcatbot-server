@@ -155,89 +155,94 @@ async function getTelegramData(bot) {
 }
 
 /**
- * X Followers — Google + DuckDuckGo fallback
+ * X Followers — Official API (Bearer Token, cached via Upstash)
+ * Includes daily delta tracking
  */
-let lastXCheck = 0;
 async function getXData() {
   const now = Date.now();
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const cacheKey = "chilledcat:last_x_data";
+  const dailyKey = `chilledcat:x_history:${today}`;
 
-  // Cache for 5 minutes
-  if (now - lastXCheck < 5 * 60 * 1000) {
-    const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) {
-      console.log("🕒 Using cached X data (<5m old)");
-      return { followers: Number(cached) || 0 };
-    }
-  }
+  const cachedEntry = await redis.get(cacheKey);
 
-  let followers = 0;
-
-  // 1️⃣ Google Search
-  try {
-    console.log("🔍 Trying Google Search for followers...");
-    const { data } = await axios.get(
-      "https://www.google.com/search?q=ChilledCatCoin+site:x.com",
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
-        },
-        timeout: 10000,
-      }
-    );
-
-    const match = data.match(/([\d,]+)\s*Followers/i);
-    if (match) {
-      followers = parseInt(match[1].replace(/,/g, ""));
-      console.log(`✅ Found via Google: ${followers} followers`);
-    } else {
-      console.warn("⚠️ Google returned no follower match");
-    }
-  } catch (err) {
-    console.warn(`⚠️ Google search failed: ${err.message}`);
-  }
-
-  // 2️⃣ DuckDuckGo fallback
-  if (!followers) {
+  // Re-use cache if <24h old
+  if (cachedEntry) {
     try {
-      console.log("🦆 Trying DuckDuckGo fallback...");
-      const { data } = await axios.get(
-        "https://duckduckgo.com/html/?q=ChilledCatCoin+site:x.com",
-        {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
-          },
-          timeout: 10000,
-        }
-      );
-
-      const match = data.match(/([\d,]+)\s*Followers/i);
-      if (match) {
-        followers = parseInt(match[1].replace(/,/g, ""));
-        console.log(`✅ Found via DuckDuckGo: ${followers} followers`);
-      } else {
-        console.warn("⚠️ DuckDuckGo returned no follower match");
+      const parsed = JSON.parse(cachedEntry);
+      if (now - parsed.timestamp < 24 * 60 * 60 * 1000) {
+        console.log("🕒 Using cached X data (<24h old)");
+        const delta = await computeDelta(parsed.followers);
+        return { followers: parsed.followers, followersDelta: delta };
       }
-    } catch (err) {
-      console.warn(`⚠️ DuckDuckGo scrape failed: ${err.message}`);
-    }
+    } catch (_) {}
   }
 
-  // 3️⃣ Cache fallback
-  if (!followers) {
-    const cached = await redis.get("chilledcat:last_x_data");
-    if (cached) {
-      followers = Number(cached) || 0;
-      console.log(`📦 Using cached followers: ${followers}`);
-    } else {
-      console.warn("⚠️ No cached follower data available");
+  const BEARER_TOKEN = process.env.X_BEARER_TOKEN;
+  if (!BEARER_TOKEN) {
+    console.error("❌ Missing X_BEARER_TOKEN in environment.");
+    if (cachedEntry) {
+      const parsed = JSON.parse(cachedEntry);
+      const delta = await computeDelta(parsed.followers);
+      console.log(`📦 Using cached followers: ${parsed.followers}`);
+      return { followers: parsed.followers, followersDelta: delta };
     }
+    return { followers: 0, followersDelta: 0 };
   }
 
-  await redis.set("chilledcat:last_x_data", String(followers));
-  lastXCheck = now;
-  return { followers };
+  const USERNAME = "ChilledCatCoin";
+  const API_URL = `https://api.twitter.com/2/users/by/username/${USERNAME}?user.fields=public_metrics`;
+
+  try {
+    console.log("🐦 Fetching followers via X API...");
+    const { data } = await axios.get(API_URL, {
+      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
+      timeout: 10000,
+    });
+
+    const followers = data?.data?.public_metrics?.followers_count ?? 0;
+    console.log(`✅ X followers fetched: ${followers}`);
+
+    const payload = { followers, timestamp: now };
+    await redis.set(cacheKey, JSON.stringify(payload));
+
+    // Save today's snapshot
+    await redis.set(dailyKey, String(followers));
+
+    const delta = await computeDelta(followers);
+    if (delta > 0) console.log(`📈 +${delta} followers since yesterday`);
+    else if (delta < 0) console.log(`📉 ${delta} followers since yesterday`);
+    else console.log("⚖️ No follower change today");
+
+    return { followers, followersDelta: delta };
+  } catch (err) {
+    console.warn("⚠️ X API fetch failed:", err.response?.data || err.message);
+
+    // fallback to cache if available
+    if (cachedEntry) {
+      try {
+        const parsed = JSON.parse(cachedEntry);
+        const delta = await computeDelta(parsed.followers);
+        console.log(`📦 Using cached followers: ${parsed.followers}`);
+        return { followers: parsed.followers, followersDelta: delta };
+      } catch (_) {
+        console.warn("⚠️ Cache parse error, returning 0 followers.");
+      }
+    }
+
+    return { followers: 0, followersDelta: 0 };
+  }
+
+  // helper to compute difference from yesterday's saved snapshot
+  async function computeDelta(current) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const yKey = `chilledcat:x_history:${yesterday}`;
+    const prev = await redis.get(yKey);
+    if (!prev) return 0;
+    const prevNum = Number(prev);
+    if (isNaN(prevNum)) return 0;
+    return current - prevNum;
+  }
 }
 
 // =====================================================
