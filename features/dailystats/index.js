@@ -9,29 +9,44 @@
  */
 
 const cron = require("node-cron");
+const { Redis } = require("@upstash/redis");
 const { postHourlyStats } = require("./dailystats");
 const { canAccess } = require("../../modules/safecat/protector");
 
+// ✅ Upstash Redis client
+const redis = new Redis({
+  url: process.env.UPSTASH_URL,
+  token: process.env.UPSTASH_TOKEN,
+});
+
 async function setupDailyStats(bot) {
-  // ✅ Your test group/channel ID only
   const TEST_CHANNEL_ID = "-4873969981"; // Chilled Cat Testing group
   console.log(`📡 DailyStats active — posting to test channel ${TEST_CHANNEL_ID}`);
 
   /* -------------------------------
-     🕒 Hourly Scheduled Update (test mode)
+     🕒 Hourly Scheduled Update
      ------------------------------- */
   cron.schedule("0 * * * *", async () => {
-    console.log("⏰ Hourly Chilled Cat stats update triggered (test mode)...");
+    const lockKey = "chilledcat:stats_lock";
+    const isLocked = await redis.get(lockKey);
+    if (isLocked) {
+      console.log("🔒 Another stats update already running, skipping this round.");
+      return;
+    }
+
+    await redis.set(lockKey, "true", { ex: 300 }); // lock for 5 min
     try {
-      // Post only inside the test channel
+      console.log("⏰ Hourly Chilled Cat stats update triggered...");
       await postHourlyStats(bot);
     } catch (err) {
       console.error("❌ Cron job failed:", err.message);
+    } finally {
+      await redis.del(lockKey);
     }
   });
 
   /* -------------------------------
-     /hourlyupdate command
+     /hourlyupdate command (manual trigger)
      ------------------------------- */
   bot.command("hourlyupdate", async (ctx) => {
     const user = ctx.from;
@@ -45,7 +60,7 @@ async function setupDailyStats(bot) {
   });
 
   /* -------------------------------
-     /checkstats command
+     /checkstats command (READ ONLY)
      ------------------------------- */
   bot.command("checkstats", async (ctx) => {
     const user = ctx.from;
@@ -53,8 +68,14 @@ async function setupDailyStats(bot) {
       return ctx.reply("🚫 Access denied — you’re not whitelisted to view stats.");
     }
 
-    await ctx.reply("ℹ️ Fetching last stats snapshot (test mode)...");
-    await postHourlyStats(bot);
+    const snapshot = await redis.get("chilledcat:stats");
+    if (!snapshot) {
+      return ctx.reply("⚠️ No stats available yet. Please wait for the next hourly update.");
+    }
+
+    await ctx.reply(`📊 *Last Chilled Cat Stats Snapshot:*\n\n${snapshot}`, {
+      parse_mode: "Markdown",
+    });
   });
 
   console.log("✅ Daily Stats feature initialized (SafeCat-secured, test-only mode)");
