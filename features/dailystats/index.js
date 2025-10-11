@@ -2,9 +2,10 @@
  * =====================================================
  * Chilled Cat Daily Stats (SafeCat-secured, test-only mode)
  * =====================================================
+ * - Safe delayed cron start (prevents deploy spam)
  * - Uses SafeCat whitelist for manual commands
  * - Posts automatically once/hour to your test channel
- * - No cooldown (for development/testing)
+ * - Read-only /checkstats command
  * =====================================================
  */
 
@@ -24,26 +25,31 @@ async function setupDailyStats(bot) {
   console.log(`📡 DailyStats active — posting to test channel ${TEST_CHANNEL_ID}`);
 
   /* -------------------------------
-     🕒 Hourly Scheduled Update
+     💤 Safe delayed cron start
      ------------------------------- */
-  cron.schedule("0 * * * *", async () => {
-    const lockKey = "chilledcat:stats_lock";
-    const isLocked = await redis.get(lockKey);
-    if (isLocked) {
-      console.log("🔒 Another stats update already running, skipping this round.");
-      return;
-    }
+  console.log("🕐 Waiting 10 seconds before starting cron scheduler...");
+  setTimeout(() => {
+    console.log("✅ Starting hourly cron job...");
 
-    await redis.set(lockKey, "true", { ex: 300 }); // lock for 5 min
-    try {
-      console.log("⏰ Hourly Chilled Cat stats update triggered...");
-      await postHourlyStats(bot);
-    } catch (err) {
-      console.error("❌ Cron job failed:", err.message);
-    } finally {
-      await redis.del(lockKey);
-    }
-  });
+    cron.schedule("0 * * * *", async () => {
+      const lockKey = "chilledcat:stats_lock";
+      const isLocked = await redis.get(lockKey);
+      if (isLocked) {
+        console.log("🔒 Another stats update already running, skipping this round.");
+        return;
+      }
+
+      await redis.set(lockKey, "true", { ex: 300 }); // lock for 5 minutes
+      try {
+        console.log("⏰ Hourly Chilled Cat stats update triggered...");
+        await postHourlyStats(bot);
+      } catch (err) {
+        console.error("❌ Cron job failed:", err.message);
+      } finally {
+        await redis.del(lockKey);
+      }
+    });
+  }, 10000); // wait 10 seconds before scheduling cron
 
   /* -------------------------------
      /hourlyupdate command (manual trigger)
