@@ -4,10 +4,11 @@ const fs = require("fs");
 
 /**
  * =====================================================
- * Chilled Cat Stats Card (Dark Mode)
+ * Chilled Cat Stats Card (Dark Mode v2)
  * =====================================================
- * - Retro-futuristic vaporwave color palette
- * - High contrast for Telegram preview
+ * - Vaporwave palette + soft glow text
+ * - Shows price, holders, liquidity, Telegram, and X stats
+ * - Displays follower delta (↑/↓)
  * =====================================================
  */
 
@@ -21,13 +22,13 @@ async function generateStatsCard(data) {
      🌌 Background gradient
      ------------------------------- */
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, "#0a0f1f");   // deep space navy
-  gradient.addColorStop(0.5, "#1c1b33"); // midnight violet
-  gradient.addColorStop(1, "#24243e");   // soft indigo
+  gradient.addColorStop(0, "#0a0f1f");
+  gradient.addColorStop(0.5, "#1c1b33");
+  gradient.addColorStop(1, "#24243e");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  // subtle noise / overlay effect (optional aesthetic)
+  // subtle star-noise overlay
   ctx.globalAlpha = 0.05;
   for (let i = 0; i < 3000; i++) {
     ctx.fillStyle = "white";
@@ -48,23 +49,56 @@ async function generateStatsCard(data) {
   };
 
   /* -------------------------------
-     ✨ Header text
+     ✨ Header
      ------------------------------- */
   ctx.font = "bold 38px 'Comic Sans MS'";
   ctx.fillStyle = "#aaf0ff";
   ctx.shadowColor = "#00ffff";
   ctx.shadowBlur = 18;
-  ctx.fillText("😺 Chilled Cat Hourly Stats", 120, 70);
+  ctx.fillText("😺 Chilled Cat Daily Stats", 110, 70);
   ctx.shadowBlur = 0;
 
   /* -------------------------------
      🧾 Stat rows
      ------------------------------- */
+  const formatNum = (n, d = 2) =>
+    typeof n === "number" ? n.toLocaleString(undefined, { maximumFractionDigits: d }) : n;
+
+  const followerDelta =
+    typeof data.followersDelta === "number" && data.followersDelta !== 0
+      ? data.followersDelta > 0
+        ? ` (+${data.followersDelta})`
+        : ` (${data.followersDelta})`
+      : "";
+
   const rows = [
-    { img: logos.dex, label: `Price: $${data.priceUsd}`, y: 160, color: "#72e3ff" },
-    { img: logos.ton, label: `Holders: ${data.holdersCount}`, y: 240, color: "#7ef7d4" },
-    { img: logos.tg, label: `Members: ${data.telegramMembers}`, y: 320, color: "#89a8ff" },
-    { img: logos.x, label: `Followers: ${data.followers}`, y: 400, color: "#d597ff" },
+    {
+      img: logos.dex,
+      label: `Price: $${formatNum(data.priceUsd, 6)} (${formatNum(data.priceChange24h, 2)}%)`,
+      y: 150,
+      color: "#72e3ff",
+    },
+    {
+      img: logos.ton,
+      label: `Holders: ${formatNum(data.holdersCount)}  |  Liquidity: $${formatNum(
+        data.liquidityUsd,
+        0
+      )}`,
+      y: 230,
+      color: "#7ef7d4",
+    },
+    {
+      img: logos.tg,
+      label: `Telegram Members: ${formatNum(data.telegramMembers)}`,
+      y: 310,
+      color: "#89a8ff",
+    },
+    {
+      img: logos.x,
+      label: `X Followers: ${formatNum(data.followers)}${followerDelta}`,
+      y: 390,
+      color: "#d597ff",
+    },
   ];
 
   for (const row of rows) {
@@ -78,7 +112,7 @@ async function generateStatsCard(data) {
   }
 
   /* -------------------------------
-     🐾 Chilled Cat logo (bottom corner)
+     🐾 Logo bottom-right
      ------------------------------- */
   ctx.drawImage(logos.cat, 600, 380, 160, 160);
 
@@ -87,7 +121,7 @@ async function generateStatsCard(data) {
      ------------------------------- */
   ctx.font = "18px 'Courier New'";
   ctx.fillStyle = "#ccc";
-  const time = data.timestamp.split(".")[0].replace("T", " ");
+  const time = (data.timestamp || new Date().toISOString()).split(".")[0].replace("T", " ");
   ctx.fillText(`Last Updated: ${time} UTC`, 70, 560);
 
   /* -------------------------------
