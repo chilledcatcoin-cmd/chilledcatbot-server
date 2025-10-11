@@ -102,30 +102,54 @@ async function getDexData() {
 }
 
 /**
- * Telegram members (HTML scraper)
+ * Telegram members (Bot API first, HTML fallback)
  */
-async function getTelegramData() {
+async function getTelegramData(bot) {
   try {
-    const url = LINKS.telegram;
-    const { data } = await axios.get(url, {
+    // 1️⃣ Try Telegram Bot API for precise member count
+    const chatInfo = await bot.telegram.getChat(CHANNEL_ID);
+    if (chatInfo && chatInfo.title) {
+      const count = chatInfo?.members_count || chatInfo?.all_members_count;
+      if (count) {
+        console.log(`👥 Accurate Telegram members (API): ${count}`);
+        await redis.set("chilledcat:last_tg", String(count));
+        return { telegramMembers: count };
+      }
+    }
+
+    // 2️⃣ Fallback to scraping if API didn’t provide count
+    console.log("⚠️ Bot API did not return members_count — falling back to HTML scrape");
+    const { data } = await axios.get(LINKS.telegram, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
       },
+      timeout: 10000,
     });
 
-    const match = data.match(/(\d+(?:,\d+)*)\s+members/);
+    const match =
+      data.match(/(\d+(?:,\d+)*)\s+members/i) ||
+      data.match(/(\d+(?:,\d+)*)\s+subscribers/i) ||
+      data.match(/tgme_page_extra[^>]*>([^<]+)<\/div>/i);
+
     if (match) {
-      const telegramMembers = parseInt(match[1].replace(/,/g, ""));
-      console.log(`👥 Scraped Telegram members: ${telegramMembers}`);
-      await redis.set("chilledcat:last_tg", String(telegramMembers));
-      return { telegramMembers };
+      const numberMatch = match[1]?.match(/(\d+(?:,\d+)*)/);
+      const count = numberMatch ? parseInt(numberMatch[1].replace(/,/g, "")) : 0;
+      if (count > 0) {
+        console.log(`👥 Scraped Telegram members (fallback): ${count}`);
+        await redis.set("chilledcat:last_tg", String(count));
+        return { telegramMembers: count };
+      }
     }
-    throw new Error("No members found in HTML");
+
+    throw new Error("No member count found in fallback HTML");
   } catch (err) {
-    console.warn("⚠️ Telegram scrape failed:", err.message);
+    console.warn("⚠️ Telegram scrape/API failed:", err.message);
     const cached = await redis.get("chilledcat:last_tg");
-    if (cached) return { telegramMembers: Number(cached) };
+    if (cached) {
+      console.log(`📦 Using cached Telegram members: ${cached}`);
+      return { telegramMembers: Number(cached) };
+    }
     return { telegramMembers: 0 };
   }
 }
@@ -247,7 +271,7 @@ async function postHourlyStats(bot) {
       getTonData(),
       getDexData(),
       getXData(),
-      getTelegramData(),
+      getTelegramData(bot),
     ]);
 
     const now = new Date();
