@@ -86,6 +86,7 @@ async function getDexData() {
       priceChange24h: parseFloat(pair?.priceChange?.h24 || 0),
       volume24hUsd: parseFloat(pair?.volume?.h24 || 0),
       liquidityUsd: parseFloat(pair?.liquidity?.usd || 0),
+      marketcapUsd: parseFloat(pair?.fdv || 0), // ✅ added
     };
 
     await redis.set("chilledcat:last_dex", JSON.stringify(result));
@@ -97,7 +98,7 @@ async function getDexData() {
       console.log("📦 Using cached Dex data");
       return JSON.parse(cached);
     }
-    return { priceUsd: 0, priceChange24h: 0, volume24hUsd: 0, liquidityUsd: 0 };
+    return { priceUsd: 0, priceChange24h: 0, volume24hUsd: 0, liquidityUsd: 0, marketcapUsd: 0 };
   }
 }
 
@@ -294,12 +295,16 @@ async function postHourlyStats(bot) {
     const imgPath = await generateStatsCard({
       ...statsData,
       timestamp: now.toISOString(),
+      nextUpdate: next.toISOString(),
     });
 
     const caption = `
+const caption = `
 🐾 [Chilled Cat Hourly Stats](https://chilledcatcoin.com)
 
 💰 [Price: ${dex.priceUsd.toFixed(6)} USD](${LINKS.dexscreener})
+📈 Marketcap: $${dex.marketcapUsd.toLocaleString()}
+💧 Liquidity: $${dex.liquidityUsd.toLocaleString()}
 🐾 [Token Holders: ${ton.holdersCount}](${LINKS.holders})
 👥 [Telegram Members: ${tg.telegramMembers}](${LINKS.telegram})
 🐦 [X Followers: ${x.followers}](${LINKS.x})
