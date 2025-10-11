@@ -298,7 +298,6 @@ async function postHourlyStats(bot) {
       nextUpdate: next.toISOString(),
     });
 
-    const caption = `
 const caption = `
 🐾 [Chilled Cat Hourly Stats](https://chilledcatcoin.com)
 
